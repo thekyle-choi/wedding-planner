@@ -1,14 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, Trash2, Calendar, Clock } from "lucide-react"
+import { Plus, Trash2, Calendar, Clock } from "lucide-react"
 
 interface ScheduleItem {
   id: string
@@ -22,7 +17,7 @@ interface ScheduleManagerProps {
   items: ScheduleItem[]
   setItems: (items: ScheduleItem[]) => void
   eventType: string
-  onBack: () => void
+  onBack?: () => void
 }
 
 const categoryOptions = {
@@ -124,214 +119,164 @@ export default function ScheduleManager({ items, setItems, eventType, onBack }: 
   const completedItems = items.filter((item) => item.completed).length
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="max-w-lg mx-auto p-4">
+    <div className="min-h-screen bg-white pb-20">
+      <div className="max-w-lg mx-auto px-5">
         {/* Mobile Header */}
-        <div className="flex items-center gap-4 mb-6 pt-4">
-          <Button variant="ghost" size="sm" onClick={onBack} className="p-2">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-light text-gray-900">일정 관리</h1>
-            <p className="text-sm text-gray-600">이벤트 일정 추적</p>
-          </div>
+        <div className="pt-12 mb-6">
+          <h1 className="text-3xl font-light text-gray-900 mb-1">일정 관리</h1>
+          <p className="text-sm text-gray-500">이벤트 일정 추적</p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-3 text-center">
-              <p className="text-lg font-light text-blue-600">{upcomingItems}</p>
-              <p className="text-xs text-gray-600">예정</p>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-3 text-center">
-              <p className="text-lg font-light text-red-600">{overdueItems}</p>
-              <p className="text-xs text-gray-600">지연</p>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-3 text-center">
-              <p className="text-lg font-light text-green-600">{completedItems}</p>
-              <p className="text-xs text-gray-600">완료</p>
-            </CardContent>
-          </Card>
+          <div className="bg-gray-50 rounded-2xl p-4 text-center">
+            <p className="text-2xl font-light text-gray-900">{upcomingItems}</p>
+            <p className="text-xs text-gray-500 mt-1">예정</p>
+          </div>
+          <div className="bg-gray-50 rounded-2xl p-4 text-center">
+            <p className="text-2xl font-light text-red-600">{overdueItems}</p>
+            <p className="text-xs text-gray-500 mt-1">지연</p>
+          </div>
+          <div className="bg-gray-50 rounded-2xl p-4 text-center">
+            <p className="text-2xl font-light text-green-600">{completedItems}</p>
+            <p className="text-xs text-gray-500 mt-1">완료</p>
+          </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <Button
+        <div className="flex gap-2 mb-6">
+          <button
             onClick={() => setShowAddForm(!showAddForm)}
-            variant={showAddForm ? "secondary" : "default"}
-            className="h-12"
+            className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
+              showAddForm ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 active:bg-gray-200"
+            }`}
           >
-            <Plus className="w-5 h-5 mr-2" />
-            {showAddForm ? "취소" : "직접 추가"}
-          </Button>
-          <Button
+            직접 추가
+          </button>
+          <button
             onClick={() => setShowTemplates(!showTemplates)}
-            variant={showTemplates ? "secondary" : "outline"}
-            className="h-12"
+            className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
+              showTemplates ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 active:bg-gray-200"
+            }`}
           >
-            <Clock className="w-4 h-4 mr-2" />
-            {showTemplates ? "취소" : "템플릿"}
-          </Button>
+            템플릿 사용
+          </button>
         </div>
 
         {/* Templates */}
         {showTemplates && (
-          <Card className="border-0 shadow-sm mb-6">
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <Label htmlFor="eventDate" className="text-sm font-medium">
-                  이벤트 날짜를 입력하세요
-                </Label>
-                <Input
-                  id="eventDate"
-                  type="date"
-                  className="mt-1 h-12"
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      addTemplateItems(e.target.value)
-                    }
-                  }}
-                />
-              </div>
-              <p className="text-xs text-gray-600">이벤트 날짜를 기준으로 추천 일정이 자동으로 생성됩니다.</p>
-            </CardContent>
-          </Card>
+          <div className="bg-gray-50 rounded-2xl p-4 mb-6">
+            <p className="text-sm font-medium text-gray-900 mb-3">이벤트 날짜를 선택하세요</p>
+            <input
+              type="date"
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+              onChange={(e) => {
+                if (e.target.value) {
+                  addTemplateItems(e.target.value)
+                }
+              }}
+            />
+            <p className="text-xs text-gray-500 mt-2">선택한 날짜를 기준으로 추천 일정이 자동 생성됩니다</p>
+          </div>
         )}
 
         {/* Add Item Form */}
         {showAddForm && (
-          <Card className="border-0 shadow-sm mb-6">
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <Label htmlFor="title" className="text-sm font-medium">
-                  일정 제목
-                </Label>
-                <Input
-                  id="title"
-                  placeholder="예: 웨딩홀 계약"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="mt-1 h-12"
-                />
-              </div>
-              <div>
-                <Label htmlFor="date" className="text-sm font-medium">
-                  날짜
-                </Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="mt-1 h-12"
-                />
-              </div>
-              <div>
-                <Label htmlFor="category" className="text-sm font-medium">
-                  카테고리
-                </Label>
-                <Select value={newCategory} onValueChange={setNewCategory}>
-                  <SelectTrigger className="mt-1 h-12">
-                    <SelectValue placeholder="선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={addItem} className="w-full h-12">
-                일정 추가
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="bg-gray-50 rounded-2xl p-4 mb-6 space-y-3">
+            <input
+              placeholder="일정 제목 (예: 웨딩홀 계약)"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <Select value={newCategory} onValueChange={setNewCategory}>
+              <SelectTrigger className="w-full h-12 bg-white border-gray-200 rounded-xl">
+                <SelectValue placeholder="카테고리 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={addItem}
+              className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm font-medium active:bg-gray-800"
+            >
+              일정 추가
+            </button>
+          </div>
         )}
 
         {/* Schedule Items */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {sortedItems.map((item) => {
             const isOverdue = !item.completed && new Date(item.date) < new Date()
             const isToday = new Date(item.date).toDateString() === new Date().toDateString()
 
             return (
-              <Card
+              <div
                 key={item.id}
-                className={`border-0 shadow-sm ${
+                className={`rounded-2xl p-4 ${
                   item.completed
                     ? "bg-gray-50"
                     : isOverdue
-                      ? "bg-red-50 border-red-200"
+                      ? "bg-red-50"
                       : isToday
-                        ? "bg-blue-50 border-blue-200"
-                        : "bg-white"
+                        ? "bg-blue-50"
+                        : "bg-gray-50"
                 }`}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={item.completed}
-                      onCheckedChange={() => toggleCompleted(item.id)}
-                      className="mt-1 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`font-medium text-sm ${item.completed ? "line-through text-gray-500" : "text-gray-900"}`}
-                      >
-                        {item.title}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(item.date).toLocaleDateString("ko-KR")}
-                        </div>
-                        <Badge
-                          variant={item.completed ? "secondary" : isOverdue ? "destructive" : "default"}
-                          className="text-xs"
-                        >
-                          {item.category}
-                        </Badge>
-                        {isOverdue && (
-                          <Badge variant="destructive" className="text-xs">
-                            지연
-                          </Badge>
-                        )}
-                        {isToday && !item.completed && (
-                          <Badge variant="default" className="text-xs bg-blue-600">
-                            오늘
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteItem(item.id)}
-                      className="text-red-600 hover:text-red-700 p-2 flex-shrink-0"
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={item.completed}
+                    onCheckedChange={() => toggleCompleted(item.id)}
+                    className="mt-0.5 w-5 h-5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-sm font-medium ${item.completed ? "line-through text-gray-400" : "text-gray-900"}`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                      {item.title}
+                    </p>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <span className="text-xs text-gray-500">
+                        {new Date(item.date).toLocaleDateString("ko-KR")}
+                      </span>
+                      <span className="text-xs text-gray-400">{item.category}</span>
+                      {isOverdue && (
+                        <span className="text-xs text-red-600 font-medium">지연</span>
+                      )}
+                      {isToday && !item.completed && (
+                        <span className="text-xs text-blue-600 font-medium">오늘</span>
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <button
+                    onClick={() => deleteItem(item.id)}
+                    className="text-gray-400 hover:text-red-600 p-1"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             )
           })}
 
           {items.length === 0 && (
-            <Card className="border-0 shadow-sm">
-              <CardContent className="text-center py-12">
-                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-2">아직 일정이 없습니다</p>
-                <p className="text-sm text-gray-400">위에서 일정을 추가하거나 템플릿을 사용해보세요</p>
-              </CardContent>
-            </Card>
+            <div className="text-center py-12">
+              <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 mb-2">일정을 추가해보세요</p>
+              <p className="text-sm text-gray-400">직접 추가하거나 템플릿을 사용할 수 있어요</p>
+            </div>
           )}
         </div>
       </div>
