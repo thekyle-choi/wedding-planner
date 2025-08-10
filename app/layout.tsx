@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
+import ServiceWorkerRegister from './sw-register'
 
 export const metadata: Metadata = {
   title: 'v0 App',
@@ -18,6 +19,12 @@ export default function RootLayout({
     <html lang="ko">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#111827" />
         <style>{`
 html {
   font-family: ${GeistSans.style.fontFamily};
@@ -31,7 +38,10 @@ body {
 }
         `}</style>
       </head>
-      <body className="overscroll-none">{children}</body>
+      <body className="overscroll-none">
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   )
 }

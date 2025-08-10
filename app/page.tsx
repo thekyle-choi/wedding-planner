@@ -10,13 +10,13 @@ import MobileNav from "./components/mobile-nav"
 interface BudgetGroup {
   id: string
   name: string
+  budget?: number
   categories: BudgetCategory[]
 }
 
 interface BudgetCategory {
   id: string
   name: string
-  budget: number
   items: BudgetItem[]
   groupId: string
 }
@@ -139,10 +139,13 @@ export default function EventPlanner() {
   }
 
 
-  const totalBudget = (budgetGroups || []).reduce(
-    (sum, group) => sum + (group.categories || []).reduce((catSum, category) => catSum + (category.budget || 0), 0),
-    0,
-  )
+  const totalBudget = (budgetGroups || []).reduce((sum, group) => {
+    // 그룹 예산 우선, 없으면 하위 카테고리의 과거 예산 합계를 fallback
+    const groupBudget = typeof group.budget === "number"
+      ? group.budget
+      : (group.categories || []).reduce((catSum: number, category: any) => catSum + (category?.budget || 0), 0)
+    return sum + (groupBudget || 0)
+  }, 0)
 
   const totalSpent = (budgetGroups || []).reduce(
     (sum, group) =>

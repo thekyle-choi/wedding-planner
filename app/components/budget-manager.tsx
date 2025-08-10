@@ -3,18 +3,18 @@
 import { useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, Trash2, ChevronDown, ChevronRight, Pencil, Check, X } from "lucide-react"
 
 interface BudgetGroup {
   id: string
   name: string
+  budget?: number
   categories: BudgetCategory[]
 }
 
 interface BudgetCategory {
   id: string
   name: string
-  budget: number
   items: BudgetItem[]
   groupId: string
 }
@@ -30,40 +30,51 @@ interface BudgetManagerProps {
   groups: BudgetGroup[]
   setGroups: (groups: BudgetGroup[]) => void
   eventType: string
-  onBack: () => void
 }
 
-export default function BudgetManager({ groups = [], setGroups, eventType, onBack }: BudgetManagerProps) {
+export default function BudgetManager({ groups = [], setGroups, eventType }: BudgetManagerProps) {
   const [showAddGroup, setShowAddGroup] = useState(false)
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
+  const [newGroupBudget, setNewGroupBudget] = useState("")
   const [newCategoryName, setNewCategoryName] = useState("")
-  const [newCategoryBudget, setNewCategoryBudget] = useState("")
   const [selectedGroupId, setSelectedGroupId] = useState("")
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [newItemName, setNewItemName] = useState("")
   const [newItemAmount, setNewItemAmount] = useState("")
 
+  // Inline editing states
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [editedGroupName, setEditedGroupName] = useState("")
+  const [editedGroupBudget, setEditedGroupBudget] = useState("")
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [editedCategoryName, setEditedCategoryName] = useState("")
+  // Quick add category per group
+  const [quickCategoryNameByGroup, setQuickCategoryNameByGroup] = useState<Record<string, string>>({})
+  const setQuickCategoryName = (groupId: string, name: string) =>
+    setQuickCategoryNameByGroup((prev) => ({ ...prev, [groupId]: name }))
+
   const addGroup = () => {
     if (newGroupName) {
       const newGroup: BudgetGroup = {
         id: Date.now().toString(),
         name: newGroupName,
+        budget: newGroupBudget ? Number.parseInt(newGroupBudget) : 0,
         categories: [],
       }
       setGroups([...groups, newGroup])
       setNewGroupName("")
+      setNewGroupBudget("")
       setShowAddGroup(false)
     }
   }
 
   const addCategory = () => {
-    if (newCategoryName && newCategoryBudget && selectedGroupId) {
+    if (newCategoryName && selectedGroupId) {
       const newCategory: BudgetCategory = {
         id: Date.now().toString(),
         name: newCategoryName,
-        budget: Number.parseInt(newCategoryBudget),
         items: [],
         groupId: selectedGroupId,
       }
@@ -74,7 +85,6 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
         ),
       )
       setNewCategoryName("")
-      setNewCategoryBudget("")
       setSelectedGroupId("")
       setShowAddCategory(false)
     }
@@ -166,11 +176,81 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
   }
 
   const getGroupBudget = (group: BudgetGroup) => {
-    return (group.categories || []).reduce((sum, category) => sum + (category.budget || 0), 0)
+    // Prefer group-level budget; fallback to legacy sum of category budgets if present
+    if (typeof group.budget === "number") return group.budget
+    return (group.categories || []).reduce((sum, category: any) => sum + (category?.budget || 0), 0)
   }
 
   const getCategorySpent = (category: BudgetCategory) => {
     return (category.items || []).reduce((sum, item) => sum + (item.paid ? item.amount || 0 : 0), 0)
+  }
+
+  const getCategoryTotal = (category: BudgetCategory) => {
+    return (category.items || []).reduce((sum, item) => sum + (item.amount || 0), 0)
+  }
+
+  const startEditGroup = (group: BudgetGroup) => {
+    setEditingGroupId(group.id)
+    setEditedGroupName(group.name)
+    setEditedGroupBudget(String(group.budget ?? getGroupBudget(group)))
+  }
+
+  const cancelEditGroup = () => {
+    setEditingGroupId(null)
+    setEditedGroupName("")
+    setEditedGroupBudget("")
+  }
+
+  const saveEditGroup = (groupId: string) => {
+    const next = groups.map((g) =>
+      g.id === groupId
+        ? { ...g, name: editedGroupName.trim() || g.name, budget: Number.parseInt(editedGroupBudget || "0") }
+        : g,
+    )
+    setGroups(next)
+    cancelEditGroup()
+  }
+
+  const startEditCategory = (category: BudgetCategory) => {
+    setEditingCategoryId(category.id)
+    setEditedCategoryName(category.name)
+  }
+
+  const cancelEditCategory = () => {
+    setEditingCategoryId(null)
+    setEditedCategoryName("")
+  }
+
+  const saveEditCategory = (groupId: string, categoryId: string) => {
+    const next = groups.map((group) =>
+      group.id === groupId
+        ? {
+            ...group,
+            categories: (group.categories || []).map((cat) =>
+              cat.id === categoryId ? { ...cat, name: editedCategoryName.trim() || cat.name } : cat,
+            ),
+          }
+        : group,
+    )
+    setGroups(next)
+    cancelEditCategory()
+  }
+
+  const addCategoryInline = (groupId: string) => {
+    const name = (quickCategoryNameByGroup[groupId] || "").trim()
+    if (!name) return
+    const newCategory: BudgetCategory = {
+      id: Date.now().toString(),
+      name,
+      items: [],
+      groupId,
+    }
+    setGroups(
+      groups.map((group) =>
+        group.id === groupId ? { ...group, categories: [...(group.categories || []), newCategory] } : group,
+      ),
+    )
+    setQuickCategoryName(groupId, "")
   }
 
   const toggleGroupExpanded = (groupId: string) => {
@@ -203,10 +283,10 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 mt-1">
           <button
             onClick={() => setShowAddGroup(!showAddGroup)}
-            className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
+            className={`flex-1 pt-3.5 pb-3 px-4 rounded-xl text-sm font-medium transition-colors ${
               showAddGroup ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 active:bg-gray-200"
             }`}
           >
@@ -225,15 +305,24 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
         {/* Add Group Form */}
         {showAddGroup && (
           <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-            <input
-              placeholder="그룹 이름 (예: 핵심 비용)"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 mb-3"
-            />
+            <div className="space-y-3">
+              <input
+                placeholder="그룹 이름 (예: 핵심 비용)"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+              />
+              <input
+                type="number"
+                placeholder="그룹 예산 (원)"
+                value={newGroupBudget}
+                onChange={(e) => setNewGroupBudget(e.target.value)}
+                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+              />
+            </div>
             <button
               onClick={addGroup}
-              className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm font-medium active:bg-gray-800"
+              className="w-full mt-3 py-3 bg-gray-900 text-white rounded-xl text-sm font-medium active:bg-gray-800"
             >
               그룹 추가
             </button>
@@ -259,13 +348,6 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
               placeholder="카테고리 이름 (예: 본식 예약금)"
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
-            />
-            <input
-              type="number"
-              placeholder="예산 (원)"
-              value={newCategoryBudget}
-              onChange={(e) => setNewCategoryBudget(e.target.value)}
               className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
             />
             <button
@@ -295,13 +377,33 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
                       ) : (
                         <ChevronRight className="w-4 h-4 text-gray-400" />
                       )}
-                      <h3 className="text-base font-medium text-gray-900">{group.name}</h3>
+                      {editingGroupId === group.id ? (
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            value={editedGroupName}
+                            onChange={(e) => setEditedGroupName(e.target.value)}
+                            className="px-2 py-1 rounded-lg border border-gray-200 text-sm bg-white"
+                          />
+                          <input
+                            type="number"
+                            value={editedGroupBudget}
+                            onChange={(e) => setEditedGroupBudget(e.target.value)}
+                            className="w-28 px-2 py-1 rounded-lg border border-gray-200 text-sm bg-white"
+                          />
+                        </div>
+                      ) : (
+                        <h3 className="text-base font-medium text-gray-900">{group.name}</h3>
+                      )}
                       <span className="text-xs text-gray-500">{(group.categories || []).length}개</span>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        deleteGroup(group.id)
+                        if (editingGroupId === group.id) {
+                          cancelEditGroup()
+                        } else {
+                          deleteGroup(group.id)
+                        }
                       }}
                       className="text-gray-400 hover:text-red-600 p-1"
                     >
@@ -310,9 +412,34 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">{groupBudget.toLocaleString()}원</span>
-                      <span className="text-gray-900 font-medium">{groupSpent.toLocaleString()}원 사용</span>
+                    <div className="flex justify-between items-center text-sm">
+                      {editingGroupId === group.id ? (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => saveEditGroup(group.id)}
+                            className="p-1 rounded-md bg-gray-900 text-white"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button onClick={cancelEditGroup} className="p-1 rounded-md bg-gray-200">
+                            <X className="w-4 h-4 text-gray-700" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startEditGroup(group)
+                          }}
+                          className="text-gray-500 hover:text-gray-700 p-1"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <div className="ml-auto flex items-center gap-4">
+                        <span className="text-gray-600">예산 {groupBudget.toLocaleString()}원</span>
+                        <span className="text-gray-900 font-medium">{groupSpent.toLocaleString()}원 사용</span>
+                      </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
                       <div
@@ -333,10 +460,26 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
 
                 {isGroupExpanded && (
                   <div className="px-4 pb-4">
+                    {/* Quick Add Category */}
+                    <div className="flex gap-2 mb-3">
+                      <input
+                        placeholder="카테고리 이름 추가"
+                        value={quickCategoryNameByGroup[group.id] || ""}
+                        onChange={(e) => setQuickCategoryName(group.id, e.target.value)}
+                        className="flex-1 min-w-0 px-3 py-2 bg-white rounded-lg text-xs border border-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-300"
+                      />
+                      <button
+                        onClick={() => addCategoryInline(group.id)}
+                        disabled={!((quickCategoryNameByGroup[group.id] || "").trim())}
+                        className="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs disabled:opacity-50"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
                     <div className="space-y-2">
                       {(group.categories || []).map((category) => {
                         const categorySpent = getCategorySpent(category)
-                        const categoryRemaining = category.budget - categorySpent
+                        const categoryTotal = getCategoryTotal(category)
                         const isCategoryExpanded = expandedCategories.has(category.id)
 
                         return (
@@ -352,37 +495,51 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
                                   ) : (
                                     <ChevronRight className="w-3 h-3 text-gray-400" />
                                   )}
-                                  <h4 className="text-sm font-medium text-gray-900">{category.name}</h4>
+                                  {editingCategoryId === category.id ? (
+                                    <input
+                                      value={editedCategoryName}
+                                      onChange={(e) => setEditedCategoryName(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="px-2 py-1 rounded-lg border border-gray-200 text-xs bg-white"
+                                    />
+                                  ) : (
+                                    <h4 className="text-sm font-medium text-gray-900">{category.name}</h4>
+                                  )}
                                 </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    deleteCategory(group.id, category.id)
-                                  }}
-                                  className="text-gray-400 hover:text-red-600 p-0.5"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  {editingCategoryId === category.id ? (
+                                    <>
+                                      <button
+                                        onClick={() => saveEditCategory(group.id, category.id)}
+                                        className="p-0.5 rounded-md bg-gray-900 text-white"
+                                      >
+                                        <Check className="w-3 h-3" />
+                                      </button>
+                                      <button onClick={cancelEditCategory} className="p-0.5 rounded-md bg-gray-200">
+                                        <X className="w-3 h-3 text-gray-700" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => startEditCategory(category)}
+                                      className="text-gray-400 hover:text-gray-600 p-0.5"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => deleteCategory(group.id, category.id)}
+                                    className="text-gray-400 hover:text-red-600 p-0.5"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
 
                               <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs">
-                                  <span className="text-gray-500">{category.budget.toLocaleString()}원</span>
-                                  <span className="text-gray-700">{categorySpent.toLocaleString()}원</span>
-                                </div>
-                                <div className="w-full bg-gray-100 rounded-full h-1">
-                                  <div
-                                    className="bg-gray-700 h-1 rounded-full transition-all duration-500"
-                                    style={{ width: `${Math.min((categorySpent / category.budget) * 100, 100)}%` }}
-                                  />
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-500">
-                                    남은 {categoryRemaining.toLocaleString()}원
-                                  </span>
-                                  <span className="text-xs text-gray-600">
-                                    {((categorySpent / category.budget) * 100).toFixed(0)}%
-                                  </span>
+                                  <span className="text-gray-500">합계 {categoryTotal.toLocaleString()}원</span>
+                                  <span className="text-gray-700">결제됨 {categorySpent.toLocaleString()}원</span>
                                 </div>
                               </div>
                             </div>
@@ -390,12 +547,12 @@ export default function BudgetManager({ groups = [], setGroups, eventType, onBac
                             {isCategoryExpanded && (
                               <div className="mt-3 space-y-2">
                                 {/* Add Item Form */}
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                   <input
                                     placeholder="항목명"
                                     value={newItemName}
                                     onChange={(e) => setNewItemName(e.target.value)}
-                                    className="flex-1 px-3 py-2 bg-gray-50 rounded-lg text-xs focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300"
+                                    className="flex-1 min-w-0 px-3 py-2 bg-gray-50 rounded-lg text-xs focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300"
                                   />
                                   <input
                                     type="number"

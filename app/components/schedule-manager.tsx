@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2, Calendar, Clock } from "lucide-react"
+import { Plus, Trash2, Clock } from "lucide-react"
 
 interface ScheduleItem {
   id: string
@@ -54,49 +54,30 @@ const scheduleTemplates = {
 
 export default function ScheduleManager({ items, setItems, eventType, onBack }: ScheduleManagerProps) {
   const [showAddForm, setShowAddForm] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
   const [newTitle, setNewTitle] = useState("")
   const [newDate, setNewDate] = useState("")
+  const [newTime, setNewTime] = useState("")
   const [newCategory, setNewCategory] = useState("")
 
   const categories = categoryOptions[eventType as keyof typeof categoryOptions] || categoryOptions.wedding
 
   const addItem = () => {
-    if (newTitle && newDate && newCategory) {
+    if (newTitle && newDate && newTime && newCategory) {
+      const dateTime = `${newDate}T${newTime}:00`
       const newItem: ScheduleItem = {
         id: Date.now().toString(),
         title: newTitle,
-        date: newDate,
+        date: dateTime,
         completed: false,
         category: newCategory,
       }
       setItems([...items, newItem])
       setNewTitle("")
       setNewDate("")
+      setNewTime("")
       setNewCategory("")
       setShowAddForm(false)
     }
-  }
-
-  const addTemplateItems = (eventDate: string) => {
-    const templates = scheduleTemplates[eventType as keyof typeof scheduleTemplates] || scheduleTemplates.wedding
-    const baseDate = new Date(eventDate)
-
-    const newItems = templates.map((template) => {
-      const itemDate = new Date(baseDate)
-      itemDate.setDate(itemDate.getDate() - template.daysBeforeEvent)
-
-      return {
-        id: Date.now().toString() + Math.random(),
-        title: template.title,
-        date: itemDate.toISOString().split("T")[0],
-        completed: false,
-        category: template.category,
-      }
-    })
-
-    setItems([...items, ...newItems])
-    setShowTemplates(false)
   }
 
   const toggleCompleted = (itemId: string) => {
@@ -153,32 +134,7 @@ export default function ScheduleManager({ items, setItems, eventType, onBack }: 
           >
             직접 추가
           </button>
-          <button
-            onClick={() => setShowTemplates(!showTemplates)}
-            className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
-              showTemplates ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 active:bg-gray-200"
-            }`}
-          >
-            템플릿 사용
-          </button>
         </div>
-
-        {/* Templates */}
-        {showTemplates && (
-          <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-            <p className="text-sm font-medium text-gray-900 mb-3">이벤트 날짜를 선택하세요</p>
-            <input
-              type="date"
-              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
-              onChange={(e) => {
-                if (e.target.value) {
-                  addTemplateItems(e.target.value)
-                }
-              }}
-            />
-            <p className="text-xs text-gray-500 mt-2">선택한 날짜를 기준으로 추천 일정이 자동 생성됩니다</p>
-          </div>
-        )}
 
         {/* Add Item Form */}
         {showAddForm && (
@@ -193,6 +149,12 @@ export default function ScheduleManager({ items, setItems, eventType, onBack }: 
               type="date"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+            />
+            <input
+              type="time"
+              value={newTime}
+              onChange={(e) => setNewTime(e.target.value)}
               className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
             />
             <Select value={newCategory} onValueChange={setNewCategory}>
@@ -249,7 +211,7 @@ export default function ScheduleManager({ items, setItems, eventType, onBack }: 
                     </p>
                     <div className="flex items-center gap-3 mt-1.5">
                       <span className="text-xs text-gray-500">
-                        {new Date(item.date).toLocaleDateString("ko-KR")}
+                        {new Date(item.date).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })}
                       </span>
                       <span className="text-xs text-gray-400">{item.category}</span>
                       {isOverdue && (
