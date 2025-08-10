@@ -50,6 +50,7 @@ interface EventSettings {
 
 interface NoteItem {
   id: string
+  title: string
   content: string
   images: string[]
   createdAt: number

@@ -6,6 +6,7 @@ const NOTES_KEY = "wedding:notes"
 
 type NoteItem = {
   id: string
+  title: string
   content: string
   images: string[]
   createdAt: number
@@ -14,8 +15,24 @@ type NoteItem = {
 
 export async function GET() {
   try {
-    const data = await redis.get<NoteItem[]>(NOTES_KEY)
-    return NextResponse.json(Array.isArray(data) ? data : [])
+    const data = await redis.get<any[]>(NOTES_KEY)
+    const list = Array.isArray(data) ? data : []
+    // Backward compatibility for items saved without title
+    const normalized: NoteItem[] = list.map((item) => {
+      const content: string = typeof item?.content === "string" ? item.content : ""
+      const fallbackTitle = deriveTitle(content)
+      return {
+        id: typeof item?.id === "string" ? item.id : crypto.randomUUID(),
+        title: typeof item?.title === "string" ? item.title : fallbackTitle,
+        content,
+        images: Array.isArray(item?.images)
+          ? item.images.filter((x: unknown) => typeof x === "string")
+          : [],
+        createdAt: typeof item?.createdAt === "number" ? item.createdAt : Date.now(),
+        updatedAt: typeof item?.updatedAt === "number" ? item.updatedAt : Date.now(),
+      }
+    })
+    return NextResponse.json(normalized)
   } catch (error) {
     console.error("Failed to get notes:", error)
     return NextResponse.json([], { status: 500 })
@@ -25,7 +42,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json()
-    const { id, content, images } = payload || {}
+    const { id, title, content, images } = payload || {}
 
     if (typeof content !== "string") {
       return NextResponse.json({ error: "invalid_content" }, { status: 400 })
@@ -34,6 +51,7 @@ export async function POST(request: NextRequest) {
     const now = Date.now()
     const newItem: NoteItem = {
       id: id || crypto.randomUUID(),
+      title: typeof title === "string" ? title : deriveTitle(content),
       content,
       images: Array.isArray(images) ? images.filter((x: unknown) => typeof x === "string") : [],
       createdAt: now,
@@ -55,7 +73,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const payload = await request.json()
-    const { id, content, images } = payload || {}
+    const { id, title, content, images } = payload || {}
 
     if (typeof id !== "string") {
       return NextResponse.json({ error: "id_required" }, { status: 400 })
@@ -70,6 +88,7 @@ export async function PUT(request: NextRequest) {
 
     const updated: NoteItem = {
       ...list[idx],
+      title: typeof title === "string" ? title : (list[idx] as any)?.title ?? deriveTitle((list[idx] as any)?.content ?? ""),
       content: typeof content === "string" ? content : list[idx].content,
       images: Array.isArray(images)
         ? images.filter((x: unknown) => typeof x === "string")
@@ -101,4 +120,11 @@ export async function DELETE(request: NextRequest) {
     console.error("Failed to delete note:", error)
     return NextResponse.json({ error: "delete_failed" }, { status: 500 })
   }
+}
+
+function deriveTitle(content: string): string {
+  const raw = (content || "").trim()
+  if (!raw) return "제목 없음"
+  const firstLine = raw.split("\n")[0]?.trim() ?? "제목 없음"
+  return firstLine.length > 50 ? firstLine.slice(0, 50) + "…" : firstLine
 }
