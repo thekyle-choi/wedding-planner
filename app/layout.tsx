@@ -5,8 +5,8 @@ import './globals.css'
 import ServiceWorkerRegister from './sw-register'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'SJJK Planner',
+  description: 'SJJK Planner - 결혼 준비를 더 간편하게',
   generator: 'v0.dev',
 }
 
@@ -22,6 +22,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="icon" href="/logo.png" />
         <link rel="apple-touch-icon" href="/logo.png" />
+        <meta name="apple-mobile-web-app-title" content="SJJK Planner" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#111827" />

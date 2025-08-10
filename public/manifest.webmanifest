@@ -1,6 +1,6 @@
 {
-  "name": "Wedding Planner",
-  "short_name": "Planner",
+  "name": "SJJK Planner",
+  "short_name": "SJJK",
   "description": "결혼식 준비를 위한 예산/일정 관리 PWA",
   "start_url": "/",
   "scope": "/",
