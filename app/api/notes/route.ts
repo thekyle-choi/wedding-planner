@@ -102,4 +102,3 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "delete_failed" }, { status: 500 })
   }
 }
-

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-```bash
+\`\`\`bash
 # Install dependencies (using pnpm)
 pnpm install
 
@@ -27,7 +27,7 @@ npm run start
 pnpm lint
 # or
 npm run lint
-```
+\`\`\`
 
 ## Architecture Overview
 
@@ -44,7 +44,7 @@ This is a Next.js 15 wedding/event planning application with the following struc
 
 ### Project Structure
 
-```
+\`\`\`
 app/
 ├── api/              # API routes for data persistence
 │   ├── budget/       # Budget data CRUD operations
@@ -64,7 +64,7 @@ components/
 
 lib/
 └── utils.ts         # Utility functions (cn for classnames)
-```
+\`\`\`
 
 ### Key Architectural Patterns
 

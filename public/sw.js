@@ -32,4 +32,3 @@ self.addEventListener('fetch', (event) => {
     )
   )
 })
-

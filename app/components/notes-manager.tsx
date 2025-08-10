@@ -246,4 +246,3 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
     </div>
   )
 }
-
