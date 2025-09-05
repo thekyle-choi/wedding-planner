@@ -7,6 +7,7 @@ import ScheduleManager from "./components/schedule-manager"
 import EventSettingsComponent from "./components/event-settings"
 import MobileNav from "./components/mobile-nav"
 import NotesManager from "./components/notes-manager"
+import RealEstateManager, { type RealEstateItem } from "./components/real-estate-manager"
 
 interface BudgetGroup {
   id: string
@@ -58,10 +59,11 @@ interface NoteItem {
 }
 
 export default function EventPlanner() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "budget" | "schedule" | "notes" | "settings">("dashboard")
+  const [activeTab, setActiveTab] = useState<"dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings">("dashboard")
   const [budgetGroups, setBudgetGroups] = useState<BudgetGroup[]>([])
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
   const [notes, setNotes] = useState<NoteItem[]>([])
+  const [realEstateItems, setRealEstateItems] = useState<RealEstateItem[]>([])
   const [eventSettings, setEventSettings] = useState<EventSettings>({
     eventType: "wedding",
     eventDate: "",
@@ -75,11 +77,12 @@ export default function EventPlanner() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [budgetRes, scheduleRes, settingsRes, notesRes] = await Promise.all([
+        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes] = await Promise.all([
           fetch("/api/budget"),
           fetch("/api/schedule"),
           fetch("/api/settings"),
           fetch("/api/notes"),
+          fetch("/api/realestate"),
         ])
 
         if (budgetRes.ok) {
@@ -102,6 +105,11 @@ export default function EventPlanner() {
         if (notesRes.ok) {
           const notesData = await notesRes.json()
           setNotes(Array.isArray(notesData) ? notesData : [])
+        }
+
+        if (realEstateRes.ok) {
+          const data = await realEstateRes.json()
+          setRealEstateItems(Array.isArray(data) ? data : [])
         }
       } catch (error) {
         console.error("Failed to load data:", error)
@@ -230,6 +238,13 @@ export default function EventPlanner() {
           <NotesManager
             notes={notes}
             setNotes={setNotes}
+          />
+        )
+      case "realestate":
+        return (
+          <RealEstateManager
+            items={realEstateItems}
+            setItems={setRealEstateItems}
           />
         )
       default:
