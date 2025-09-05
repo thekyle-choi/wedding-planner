@@ -278,7 +278,8 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
   const showNext = () => preview && setPreview({ images: preview.images, index: (preview.index + 1) % preview.images.length })
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="min-h-screen bg-white pb-20">
+      <div className="max-w-lg mx-auto px-5 space-y-6">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="flex items-center gap-2 p-4">
           {mode === "list" ? (
@@ -307,7 +308,7 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
       </div>
 
       {mode === "create" && (
-        <div className="px-4">
+        <div>
           <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -441,7 +442,7 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
       )}
 
       {mode === "list" && (
-        <div className="px-4 space-y-3">
+        <div className="space-y-3">
           <div className="flex items-center gap-2">
             <input
               value={keyword}
@@ -486,31 +487,33 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
           ))}
         </div>
       )}
+      </div>
 
       {/* Detail */}
       {selected && (
         <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
-          <div className="flex items-center gap-2 p-4 border-b">
-            <button onClick={() => setSelectedId(null)} className="p-2 -ml-2"><ArrowLeft className="w-5 h-5 text-gray-500" /></button>
-            <h3 className="text-base font-semibold">상세</h3>
-            <div className="ml-auto flex items-center gap-2">
-              {!isEditing ? (
-                <button onClick={() => setIsEditing(true)} className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 flex items-center gap-1"><Edit3 className="w-4 h-4" />편집</button>
-              ) : (
-                <button onClick={handleSaveDetail} className="px-3 py-1.5 rounded-lg bg-gray-900 text-white flex items-center gap-1"><Save className="w-4 h-4" />저장</button>
-              )}
-              <button onClick={() => handleDelete(selected.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 flex items-center gap-1"><Trash2 className="w-4 h-4" />삭제</button>
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-center gap-2 p-4 border-b">
+              <button onClick={() => setSelectedId(null)} className="p-2 -ml-2"><ArrowLeft className="w-5 h-5 text-gray-500" /></button>
+              <h3 className="text-base font-semibold">상세</h3>
+              <div className="ml-auto flex items-center gap-2">
+                {!isEditing ? (
+                  <button onClick={() => setIsEditing(true)} className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 flex items-center gap-1"><Edit3 className="w-4 h-4" />편집</button>
+                ) : (
+                  <button onClick={handleSaveDetail} className="px-3 py-1.5 rounded-lg bg-gray-900 text-white flex items-center gap-1"><Save className="w-4 h-4" />저장</button>
+                )}
+                <button onClick={() => handleDelete(selected.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 flex items-center gap-1"><Trash2 className="w-4 h-4" />삭제</button>
+              </div>
             </div>
-          </div>
 
-          <div className="p-4 space-y-4 pb-28">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="p-4 space-y-4 pb-28">
+              <div className="grid grid-cols-3 gap-2">
               {(["월세", "전세", "매매"] as DealType[]).map((t) => (
                 <button key={t} disabled={!isEditing} onClick={() => selected && setItems(items.map((x) => x.id === selected.id ? { ...x, dealType: t } : x))} className={`py-2 rounded-lg text-sm ${selected.dealType === t ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
                   {t}
                 </button>
               ))}
-            </div>
+              </div>
 
             <div className="grid grid-cols-2 gap-2">
               {selected.dealType === "월세" && (
@@ -610,6 +613,7 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
                 </div>
               )}
             </div>
+          </div>
           </div>
 
           {/* Image previewer */}
