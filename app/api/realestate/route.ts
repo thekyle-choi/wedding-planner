@@ -19,9 +19,14 @@ type RealEstateItem = {
     price?: number
   }
   location: string
+  area: {
+    sqm?: number
+    pyeong?: number
+  }
   images: string[]
   url?: string
   memo: string
+  transportation: string
   rating: number // 1~5
   moveInType: "immediate" | "date"
   moveInDate?: string
@@ -39,6 +44,7 @@ export async function GET() {
           ? item.dealType
           : "월세"
         const price = typeof item?.price === "object" && item?.price !== null ? item.price : {}
+        const area = typeof item?.area === "object" && item?.area !== null ? item.area : {}
         return {
           id: typeof item?.id === "string" ? item.id : crypto.randomUUID(),
           dealType,
@@ -48,11 +54,16 @@ export async function GET() {
             price: typeof price?.price === "number" ? price.price : undefined,
           },
           location: typeof item?.location === "string" ? item.location : "",
+          area: {
+            sqm: typeof area?.sqm === "number" ? area.sqm : undefined,
+            pyeong: typeof area?.pyeong === "number" ? area.pyeong : undefined,
+          },
           images: Array.isArray(item?.images)
             ? item.images.filter((x: unknown) => typeof x === "string")
             : [],
           url: typeof item?.url === "string" ? item.url : undefined,
           memo: typeof item?.memo === "string" ? item.memo : "",
+          transportation: typeof item?.transportation === "string" ? item.transportation : "",
           rating: typeof item?.rating === "number" ? item.rating : 0,
           moveInType: item?.moveInType === "date" || item?.moveInType === "immediate" ? item.moveInType : "immediate",
           moveInDate: typeof item?.moveInDate === "string" ? item.moveInDate : undefined,
@@ -72,13 +83,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json()
-    const { id, dealType, price, location, images, memo, rating, url, moveInType, moveInDate } = payload || {}
+    const { id, dealType, price, location, area, images, memo, transportation, rating, url, moveInType, moveInDate } = payload || {}
 
     const validDealType: DealType = ["월세", "전세", "매매"].includes(dealType)
       ? dealType
       : "월세"
 
     const priceObj = typeof price === "object" && price !== null ? price : {}
+    const areaObj = typeof area === "object" && area !== null ? area : {}
 
     const now = Date.now()
     const newItem: RealEstateItem = {
@@ -90,9 +102,14 @@ export async function POST(request: NextRequest) {
         price: typeof priceObj?.price === "number" ? priceObj.price : undefined,
       },
       location: typeof location === "string" ? location : "",
+      area: {
+        sqm: typeof areaObj?.sqm === "number" ? areaObj.sqm : undefined,
+        pyeong: typeof areaObj?.pyeong === "number" ? areaObj.pyeong : undefined,
+      },
       images: Array.isArray(images) ? images.filter((x: unknown) => typeof x === "string") : [],
       url: typeof url === "string" ? url : undefined,
       memo: typeof memo === "string" ? memo : "",
+      transportation: typeof transportation === "string" ? transportation : "",
       rating: typeof rating === "number" ? rating : 0,
       moveInType: moveInType === "date" || moveInType === "immediate" ? moveInType : "immediate",
       moveInDate: typeof moveInDate === "string" ? moveInDate : undefined,
@@ -115,7 +132,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const payload = await request.json()
-    const { id, dealType, price, location, images, memo, rating, url, moveInType, moveInDate } = payload || {}
+    const { id, dealType, price, location, area, images, memo, transportation, rating, url, moveInType, moveInDate } = payload || {}
     if (typeof id !== "string") {
       return NextResponse.json({ error: "invalid_id" }, { status: 400 })
     }
@@ -130,6 +147,7 @@ export async function PUT(request: NextRequest) {
       ? dealType
       : current.dealType
     const priceObj = typeof price === "object" && price !== null ? price : current.price
+    const areaObj = typeof area === "object" && area !== null ? area : current.area || {}
 
     const updated: RealEstateItem = {
       ...current,
@@ -140,11 +158,16 @@ export async function PUT(request: NextRequest) {
         price: typeof priceObj?.price === "number" ? priceObj.price : undefined,
       },
       location: typeof location === "string" ? location : current.location,
+      area: {
+        sqm: typeof areaObj?.sqm === "number" ? areaObj.sqm : undefined,
+        pyeong: typeof areaObj?.pyeong === "number" ? areaObj.pyeong : undefined,
+      },
       images: Array.isArray(images)
         ? images.filter((x: unknown) => typeof x === "string")
         : current.images,
       url: typeof url === "string" ? url : current.url,
       memo: typeof memo === "string" ? memo : current.memo,
+      transportation: typeof transportation === "string" ? transportation : current.transportation || "",
       rating: typeof rating === "number" ? rating : current.rating,
       moveInType: moveInType === "date" || moveInType === "immediate" ? moveInType : current.moveInType,
       moveInDate: typeof moveInDate === "string" ? moveInDate : current.moveInDate,
