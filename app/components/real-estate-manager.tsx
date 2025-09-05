@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Plus, Upload, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, ArrowLeft, Save, Edit3, MapPin, Star, Loader2 } from "lucide-react"
+import { Upload, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, ArrowLeft, Save, Edit3, MapPin, Star, Loader2, ChevronDown } from "lucide-react"
 
 type DealType = "월세" | "전세" | "매매"
 
@@ -39,6 +39,7 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
   const [mode, setMode] = useState<"list" | "create">("list")
   const [keyword, setKeyword] = useState<string>("")
   const [sortBy, setSortBy] = useState<"updated" | "rating" | "priceAsc" | "priceDesc">("updated")
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [dealType, setDealType] = useState<DealType>("월세")
   const [deposit, setDeposit] = useState<string>("")
   const [monthly, setMonthly] = useState<string>("")
@@ -133,6 +134,42 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
     })
     return sorted
   }, [items, keyword, sortBy])
+
+  // 그룹화된 데이터 (지역별)
+  const groupedData = useMemo(() => {
+    const groups: Record<string, RealEstateItem[]> = {}
+    
+    filteredSorted.forEach((item) => {
+      const city = extractCity(item.location)
+      if (!groups[city]) {
+        groups[city] = []
+      }
+      groups[city].push(item)
+    })
+    
+    // 그룹을 배열로 변환하고 항목 수로 정렬
+    return Object.entries(groups)
+      .map(([city, items]) => ({ city, items, count: items.length }))
+      .sort((a, b) => b.count - a.count)
+  }, [filteredSorted])
+
+  const toggleGroupExpanded = (city: string) => {
+    const newExpanded = new Set(expandedGroups)
+    if (newExpanded.has(city)) {
+      newExpanded.delete(city)
+    } else {
+      newExpanded.add(city)
+    }
+    setExpandedGroups(newExpanded)
+  }
+
+  // 그룹 뷰: 처음 로딩하거나 그룹이 바뀔 때 모든 그룹 자동 확장
+  useEffect(() => {
+    if (groupedData.length > 0) {
+      const allCities = new Set(groupedData.map(g => g.city))
+      setExpandedGroups(allCities)
+    }
+  }, [groupedData])
 
   // Clipboard paste handler (detail mode)
   useEffect(() => {
@@ -566,33 +603,65 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
               <option value="priceDesc">가격높은순</option>
             </select>
           </div>
-
-          {filteredSorted.map((item) => (
-            <button key={item.id} onClick={() => { setSelectedId(item.id); setIsEditing(false) }} className="w-full text-left bg-gray-50 rounded-2xl p-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="text-sm text-gray-500">{item.dealType}</div>
-                  <div className="font-medium text-gray-900">
-                    {formatPrice(item.dealType, item.price)}
-                  </div>
-                  <div className="text-sm text-gray-600 flex items-center gap-1"><MapPin className="w-4 h-4" /> {item.location || "위치 미입력"}</div>
-                  {formatArea(item.area) && (
-                    <div className="text-sm text-gray-500">{formatArea(item.area)}</div>
+          
+          {/* Group View (통합) */}
+            <>
+              {groupedData.map(({ city, items, count }) => (
+                <div key={city} className="bg-gray-50 rounded-2xl overflow-hidden">
+                  <button
+                    onClick={() => toggleGroupExpanded(city)}
+                    className="w-full p-4 text-left hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {expandedGroups.has(city) ? (
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-400" />
+                        )}
+                        <h3 className="text-base font-medium text-gray-900">{city}</h3>
+                        <span className="text-sm text-gray-500">({count}개)</span>
+                      </div>
+                    </div>
+                  </button>
+                  
+                  {expandedGroups.has(city) && (
+                    <div className="px-4 pb-4 space-y-2">
+                      {items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => { setSelectedId(item.id); setIsEditing(false) }}
+                          className="w-full text-left bg-white rounded-xl p-3 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1 space-y-1">
+                              <div className="text-sm text-gray-500">{item.dealType}</div>
+                              <div className="font-medium text-gray-900 text-sm">
+                                {formatPrice(item.dealType, item.price)}
+                              </div>
+                              <div className="text-xs text-gray-600 flex items-center gap-1">
+                                <MapPin className="w-3 h-3" /> {item.location || "위치 미입력"}
+                              </div>
+                              {formatArea(item.area) && (
+                                <div className="text-xs text-gray-500">{formatArea(item.area)}</div>
+                              )}
+                              <div className="flex items-center gap-1 pt-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star key={i} className={`w-3 h-3 ${item.rating >= i + 1 ? "text-yellow-500 fill-yellow-500" : "text-gray-300"}`} />
+                                ))}
+                              </div>
+                            </div>
+                            {item.images.length > 0 && (
+                              <img src={item.images[0]} alt="preview" className="w-16 h-16 object-cover rounded-lg" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className={`w-4 h-4 ${item.rating >= i + 1 ? "text-yellow-500 fill-yellow-500" : "text-gray-300"}`} />
-                  ))}
-                </div>
-              </div>
-              {item.images.length > 0 && (
-                <div className="mt-3">
-                  <img src={item.images[0]} alt="preview" className="w-full h-40 object-cover rounded-xl" />
-                </div>
-              )}
-            </button>
-          ))}
+              ))}
+            </>
         </div>
       )}
       </div>
@@ -823,6 +892,41 @@ function formatArea(area?: RealEstateItem["area"]) {
   if (area.pyeong) return `${area.pyeong}평`
   if (area.sqm) return `${area.sqm}㎡`
   return ""
+}
+
+// 지역명에서 시 이름 추출
+function extractCity(location: string): string {
+  if (!location) return "기타"
+  
+  // 시 단위 추출 (예: "경기도 의정부시" → "의정부시")
+  const cityMatch = location.match(/([가-힣]+시)/);
+  if (cityMatch) {
+    return cityMatch[1];
+  }
+  
+  // 구 단위 추출 (예: "서울특별시 강남구" → "강남구")
+  const guMatch = location.match(/([가-힣]+구)/);
+  if (guMatch) {
+    return guMatch[1];
+  }
+  
+  // 군 단위 추출 (예: "경기도 가평군" → "가평군")
+  const gunMatch = location.match(/([가-힣]+군)/);
+  if (gunMatch) {
+    return gunMatch[1];
+  }
+  
+  // 특별한 경우들 처리
+  if (location.includes("서울")) return "서울";
+  if (location.includes("인천")) return "인천";
+  if (location.includes("대전")) return "대전";
+  if (location.includes("대구")) return "대구";
+  if (location.includes("부산")) return "부산";
+  if (location.includes("광주")) return "광주";
+  if (location.includes("울산")) return "울산";
+  if (location.includes("세종")) return "세종";
+  
+  return "기타";
 }
 
 

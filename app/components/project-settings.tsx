@@ -130,7 +130,7 @@ export default function ProjectSettings({ settings, setSettings, onBack }: Proje
                 <Input
                   id="person1"
                   value={localSettings.couple.person1}
-                  onChange={(e) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setLocalSettings({
                       ...localSettings,
                       couple: { ...localSettings.couple, person1: e.target.value },
@@ -148,7 +148,7 @@ export default function ProjectSettings({ settings, setSettings, onBack }: Proje
                   <Input
                     id="person2"
                     value={localSettings.couple.person2}
-                    onChange={(e) =>
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setLocalSettings({
                         ...localSettings,
                         couple: { ...localSettings.couple, person2: e.target.value },
@@ -178,7 +178,7 @@ export default function ProjectSettings({ settings, setSettings, onBack }: Proje
                 <Input
                   id="eventTitle"
                   value={localSettings.eventTitle}
-                  onChange={(e) => setLocalSettings({ ...localSettings, eventTitle: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLocalSettings({ ...localSettings, eventTitle: e.target.value })}
                   className="mt-1 h-12"
                   placeholder="SJ ♥ JK의 결혼식"
                 />
@@ -199,7 +199,7 @@ export default function ProjectSettings({ settings, setSettings, onBack }: Proje
                   id="eventDate"
                   type="date"
                   value={localSettings.eventDate}
-                  onChange={(e) => setLocalSettings({ ...localSettings, eventDate: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLocalSettings({ ...localSettings, eventDate: e.target.value })}
                   className="mt-1 h-12"
                 />
               </div>
