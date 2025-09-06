@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2, Clock } from "lucide-react"
+import { Plus, Trash2, Clock, Edit, Check, X } from "lucide-react"
 
 interface ScheduleItem {
   id: string
@@ -58,6 +58,11 @@ export default function ScheduleManager({ items, setItems, eventType, onBack }: 
   const [newDate, setNewDate] = useState("")
   const [newTime, setNewTime] = useState("")
   const [newCategory, setNewCategory] = useState("")
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editDate, setEditDate] = useState("")
+  const [editTime, setEditTime] = useState("")
+  const [editCategory, setEditCategory] = useState("")
 
   const categories = categoryOptions[eventType as keyof typeof categoryOptions] || categoryOptions.wedding
 
@@ -86,6 +91,35 @@ export default function ScheduleManager({ items, setItems, eventType, onBack }: 
 
   const deleteItem = (itemId: string) => {
     setItems(items.filter((item) => item.id !== itemId))
+  }
+
+  const startEditing = (item: ScheduleItem) => {
+    setEditingItemId(item.id)
+    setEditTitle(item.title)
+    const [date, time] = item.date.split('T')
+    setEditDate(date)
+    setEditTime(time.substring(0, 5)) // Remove seconds
+    setEditCategory(item.category)
+  }
+
+  const cancelEditing = () => {
+    setEditingItemId(null)
+    setEditTitle("")
+    setEditDate("")
+    setEditTime("")
+    setEditCategory("")
+  }
+
+  const updateItem = (itemId: string) => {
+    if (editTitle && editDate && editTime && editCategory) {
+      const dateTime = `${editDate}T${editTime}:00`
+      setItems(items.map((item) => 
+        item.id === itemId 
+          ? { ...item, title: editTitle, date: dateTime, category: editCategory }
+          : item
+      ))
+      cancelEditing()
+    }
   }
 
   const sortedItems = [...items].sort((a, b) => {
@@ -197,38 +231,97 @@ export default function ScheduleManager({ items, setItems, eventType, onBack }: 
                         : "bg-gray-50"
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={item.completed}
-                    onCheckedChange={() => toggleCompleted(item.id)}
-                    className="mt-0.5 w-5 h-5"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-sm font-medium ${item.completed ? "line-through text-gray-400" : "text-gray-900"}`}
-                    >
-                      {item.title}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-xs text-gray-500">
-                        {new Date(item.date).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })}
-                      </span>
-                      <span className="text-xs text-gray-400">{item.category}</span>
-                      {isOverdue && (
-                        <span className="text-xs text-red-600 font-medium">지연</span>
-                      )}
-                      {isToday && !item.completed && (
-                        <span className="text-xs text-blue-600 font-medium">오늘</span>
-                      )}
+                {editingItemId === item.id ? (
+                  <div className="space-y-3">
+                    <input
+                      placeholder="일정 제목"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="flex-1 px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                      />
+                      <input
+                        type="time"
+                        value={editTime}
+                        onChange={(e) => setEditTime(e.target.value)}
+                        className="flex-1 px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                      />
+                    </div>
+                    <Select value={editCategory} onValueChange={setEditCategory}>
+                      <SelectTrigger className="w-full h-10 bg-white border-gray-200 rounded-lg">
+                        <SelectValue placeholder="카테고리 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={cancelEditing}
+                        className="px-3 py-1.5 text-gray-600 hover:text-gray-800 text-sm"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => updateItem(item.id)}
+                        className="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => deleteItem(item.id)}
-                    className="text-gray-400 hover:text-red-600 p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={item.completed}
+                      onCheckedChange={() => toggleCompleted(item.id)}
+                      className="mt-0.5 w-5 h-5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`text-sm font-medium ${item.completed ? "line-through text-gray-400" : "text-gray-900"}`}
+                      >
+                        {item.title}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-xs text-gray-500">
+                          {new Date(item.date).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })}
+                        </span>
+                        <span className="text-xs text-gray-400">{item.category}</span>
+                        {isOverdue && (
+                          <span className="text-xs text-red-600 font-medium">지연</span>
+                        )}
+                        {isToday && !item.completed && (
+                          <span className="text-xs text-blue-600 font-medium">오늘</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => startEditing(item)}
+                        className="text-gray-400 hover:text-blue-600 p-1"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        className="text-gray-400 hover:text-red-600 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}

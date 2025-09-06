@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Grid3X3, X, Wallet, Clock, StickyNote, Building2, Settings } from "lucide-react"
 import BudgetManager from "./components/budget-manager"
 import ScheduleManager from "./components/schedule-manager"
 import EventSettingsComponent from "./components/event-settings"
@@ -60,6 +60,21 @@ interface NoteItem {
 
 export default function EventPlanner() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings">("dashboard")
+  const [showGridMenu, setShowGridMenu] = useState(false)
+
+  // Close grid menu with escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showGridMenu) {
+        setShowGridMenu(false)
+      }
+    }
+    
+    if (showGridMenu) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showGridMenu])
   const [budgetGroups, setBudgetGroups] = useState<BudgetGroup[]>([])
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
   const [notes, setNotes] = useState<NoteItem[]>([])
@@ -263,12 +278,63 @@ export default function EventPlanner() {
 
   const totalCategories = (budgetGroups || []).reduce((sum, group) => sum + (group.categories || []).length, 0)
 
+  // Grid menu items (홈 제외)
+  const gridMenuItems = [
+    { id: "budget" as const, label: "예산 관리", icon: Wallet, color: "text-blue-600", description: `${totalCategories}개 카테고리` },
+    { id: "schedule" as const, label: "일정 관리", icon: Clock, color: "text-green-600", description: `${completedTasks}/${totalTasks}개 완료` },
+    { id: "realestate" as const, label: "부동산", icon: Building2, color: "text-purple-600", description: "매물 관리" },
+    { id: "notes" as const, label: "메모", icon: StickyNote, color: "text-orange-600", description: `${notes.length}개 메모` },
+    { id: "settings" as const, label: "설정", icon: Settings, color: "text-gray-600", description: "이벤트 설정" },
+  ]
+
   return (
     <div className="min-h-screen bg-white">
+      {/* Grid Menu Overlay */}
+      {showGridMenu && (
+        <div className="fixed inset-0 z-50 bg-white transition-opacity duration-200">
+          <div className="max-w-lg mx-auto px-5">
+            {/* Header */}
+            <div className="flex items-center justify-between pt-12 mb-8">
+              <h1 className="text-3xl font-light text-gray-900">메뉴</h1>
+              <button
+                onClick={() => setShowGridMenu(false)}
+                className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                aria-label="닫기"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Grid Menu Items */}
+            <div className="grid grid-cols-2 gap-3 pb-20">
+              {gridMenuItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id)
+                      setShowGridMenu(false)
+                    }}
+                    className="text-left p-5 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors duration-150 h-28 flex flex-col group"
+                  >
+                    <div className="mb-3">
+                      <Icon className={`w-7 h-7 ${item.color}`} />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-0.5 leading-tight">{item.label}</h3>
+                    <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "dashboard" ? (
         <div className="max-w-lg mx-auto px-5 pb-20">
           {/* Mobile Header */}
-          <div className="text-center mb-6 pt-12">
+          <div className="relative text-center mb-6 pt-12">
             <h1 className="text-3xl font-light text-gray-900 mb-1">{eventSettings.eventTitle}</h1>
             {daysUntilEvent !== null && (
               <div className="text-center mb-3">
@@ -281,6 +347,15 @@ export default function EventPlanner() {
                 </span>
               </div>
             )}
+            
+            {/* Grid Menu Button */}
+            <button
+              onClick={() => setShowGridMenu(true)}
+              className="absolute top-12 right-0 p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              aria-label="메뉴"
+            >
+              <Grid3X3 className="w-5 h-5" />
+            </button>
           </div>
 
         {/* Consolidated Budget Card */}
@@ -375,8 +450,10 @@ export default function EventPlanner() {
         renderContent()
       )}
 
-      {/* Mobile Navigation - Always Visible */}
-      <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* Mobile Navigation - Hidden when grid menu is open */}
+      {!showGridMenu && (
+        <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      )}
     </div>
   )
 }

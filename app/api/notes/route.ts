@@ -8,6 +8,7 @@ type NoteItem = {
   id: string
   title: string
   content: string
+  category: string
   images: string[]
   createdAt: number
   updatedAt: number
@@ -17,7 +18,7 @@ export async function GET() {
   try {
     const data = await redis.get<any[]>(NOTES_KEY)
     const list = Array.isArray(data) ? data : []
-    // Backward compatibility for items saved without title
+    // Backward compatibility for items saved without title and category
     const normalized: NoteItem[] = list.map((item) => {
       const content: string = typeof item?.content === "string" ? item.content : ""
       const fallbackTitle = deriveTitle(content)
@@ -25,6 +26,7 @@ export async function GET() {
         id: typeof item?.id === "string" ? item.id : crypto.randomUUID(),
         title: typeof item?.title === "string" ? item.title : fallbackTitle,
         content,
+        category: typeof item?.category === "string" ? item.category : "general",
         images: Array.isArray(item?.images)
           ? item.images.filter((x: unknown) => typeof x === "string")
           : [],
@@ -42,7 +44,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json()
-    const { id, title, content, images } = payload || {}
+    const { id, title, content, category, images } = payload || {}
 
     if (typeof content !== "string") {
       return NextResponse.json({ error: "invalid_content" }, { status: 400 })
@@ -53,6 +55,7 @@ export async function POST(request: NextRequest) {
       id: id || crypto.randomUUID(),
       title: typeof title === "string" ? title : deriveTitle(content),
       content,
+      category: typeof category === "string" ? category : "general",
       images: Array.isArray(images) ? images.filter((x: unknown) => typeof x === "string") : [],
       createdAt: now,
       updatedAt: now,
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const payload = await request.json()
-    const { id, title, content, images } = payload || {}
+    const { id, title, content, category, images } = payload || {}
 
     if (typeof id !== "string") {
       return NextResponse.json({ error: "id_required" }, { status: 400 })
@@ -90,6 +93,7 @@ export async function PUT(request: NextRequest) {
       ...list[idx],
       title: typeof title === "string" ? title : (list[idx] as any)?.title ?? deriveTitle((list[idx] as any)?.content ?? ""),
       content: typeof content === "string" ? content : list[idx].content,
+      category: typeof category === "string" ? category : (list[idx] as any)?.category ?? "general",
       images: Array.isArray(images)
         ? images.filter((x: unknown) => typeof x === "string")
         : list[idx].images,
