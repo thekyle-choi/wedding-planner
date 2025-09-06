@@ -1,17 +1,17 @@
 "use client"
 
-import { Home, Wallet, Clock, Settings, StickyNote, Building2 } from "lucide-react"
+import { Home, Wallet, Clock, Settings, StickyNote, Building2, DollarSign } from "lucide-react"
 
 interface MobileNavProps {
-  activeTab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings"
-  setActiveTab: (tab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings") => void
+  activeTab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income"
+  setActiveTab: (tab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income") => void
 }
 
 export default function MobileNav({ activeTab, setActiveTab }: MobileNavProps) {
   const navItems = [
     { id: "dashboard" as const, label: "홈", icon: Home },
     { id: "budget" as const, label: "예산", icon: Wallet },
-    { id: "schedule" as const, label: "일정", icon: Clock },
+    { id: "income" as const, label: "수입", icon: DollarSign },
     { id: "realestate" as const, label: "부동산", icon: Building2 },
     { id: "notes" as const, label: "메모", icon: StickyNote },
   ]

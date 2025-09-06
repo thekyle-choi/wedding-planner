@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Grid3X3, X, Wallet, Clock, StickyNote, Building2, Settings } from "lucide-react"
+import { Wallet, Clock, StickyNote, Building2, Settings, DollarSign } from "lucide-react"
 import BudgetManager from "./components/budget-manager"
 import ScheduleManager from "./components/schedule-manager"
 import EventSettingsComponent from "./components/event-settings"
 import MobileNav from "./components/mobile-nav"
 import NotesManager from "./components/notes-manager"
 import RealEstateManager, { type RealEstateItem, type SubscriptionItem } from "./components/real-estate-manager"
+import IncomeManagerUltra from "./components/income-manager-ultra"
+import { type IncomeDatabase, createEmptyIncomeDatabase } from "@/lib/income-types-simple"
 
 interface BudgetGroup {
   id: string
@@ -53,33 +55,20 @@ interface NoteItem {
   id: string
   title: string
   content: string
+  category: string
   images: string[]
   createdAt: number
   updatedAt: number
 }
 
 export default function EventPlanner() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings">("dashboard")
-  const [showGridMenu, setShowGridMenu] = useState(false)
-
-  // Close grid menu with escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showGridMenu) {
-        setShowGridMenu(false)
-      }
-    }
-    
-    if (showGridMenu) {
-      document.addEventListener('keydown', handleKeyDown)
-      return () => document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showGridMenu])
+  const [activeTab, setActiveTab] = useState<"dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income">("dashboard")
   const [budgetGroups, setBudgetGroups] = useState<BudgetGroup[]>([])
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
   const [notes, setNotes] = useState<NoteItem[]>([])
   const [realEstateItems, setRealEstateItems] = useState<RealEstateItem[]>([])
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
+  const [incomeDatabase, setIncomeDatabase] = useState<IncomeDatabase>(createEmptyIncomeDatabase())
   const [eventSettings, setEventSettings] = useState<EventSettings>({
     eventType: "wedding",
     eventDate: "",
@@ -93,13 +82,14 @@ export default function EventPlanner() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes, subscriptionsRes] = await Promise.all([
+        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes, subscriptionsRes, incomeRes] = await Promise.all([
           fetch("/api/budget"),
           fetch("/api/schedule"),
           fetch("/api/settings"),
           fetch("/api/notes"),
           fetch("/api/realestate"),
           fetch("/api/subscriptions"),
+          fetch("/api/income"),
         ])
 
         if (budgetRes.ok) {
@@ -132,6 +122,33 @@ export default function EventPlanner() {
         if (subscriptionsRes.ok) {
           const data = await subscriptionsRes.json()
           setSubscriptions(Array.isArray(data) ? data : [])
+        }
+
+        if (incomeRes.ok) {
+          const data = await incomeRes.json()
+          if (data) {
+            // 기존 데이터에 personalItems가 없는 경우 빈 배열로 초기화
+            const migratedData = {
+              ...data,
+              groups: Object.fromEntries(
+                Object.entries(data.groups || {}).map(([groupId, group]: [string, any]) => [
+                  groupId,
+                  {
+                    ...group,
+                    jkData: {
+                      ...group.jkData,
+                      personalItems: group.jkData?.personalItems || []
+                    },
+                    sjData: {
+                      ...group.sjData,
+                      personalItems: group.sjData?.personalItems || []
+                    }
+                  }
+                ])
+              )
+            }
+            setIncomeDatabase(migratedData)
+          }
         }
       } catch (error) {
         console.error("Failed to load data:", error)
@@ -182,6 +199,19 @@ export default function EventPlanner() {
       setEventSettings(settings)
     } catch (error) {
       console.error("Failed to save settings:", error)
+    }
+  }
+
+  const saveIncomeDatabase = async (database: IncomeDatabase) => {
+    try {
+      await fetch("/api/income", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(database),
+      })
+      setIncomeDatabase(database)
+    } catch (error) {
+      console.error("Failed to save income database:", error)
     }
   }
 
@@ -271,6 +301,13 @@ export default function EventPlanner() {
             setSubscriptions={setSubscriptions}
           />
         )
+      case "income":
+        return (
+          <IncomeManagerUltra
+            incomeDatabase={incomeDatabase}
+            setIncomeDatabase={saveIncomeDatabase}
+          />
+        )
       default:
         return null
     }
@@ -278,58 +315,19 @@ export default function EventPlanner() {
 
   const totalCategories = (budgetGroups || []).reduce((sum, group) => sum + (group.categories || []).length, 0)
 
-  // Grid menu items (홈 제외)
-  const gridMenuItems = [
-    { id: "budget" as const, label: "예산 관리", icon: Wallet, color: "text-blue-600", description: `${totalCategories}개 카테고리` },
-    { id: "schedule" as const, label: "일정 관리", icon: Clock, color: "text-green-600", description: `${completedTasks}/${totalTasks}개 완료` },
-    { id: "realestate" as const, label: "부동산", icon: Building2, color: "text-purple-600", description: "매물 관리" },
-    { id: "notes" as const, label: "메모", icon: StickyNote, color: "text-orange-600", description: `${notes.length}개 메모` },
-    { id: "settings" as const, label: "설정", icon: Settings, color: "text-gray-600", description: "이벤트 설정" },
+  // 소형 아이콘 메뉴 항목 (대시보드 내 표시용)
+  const smallMenuItems = [
+    { id: "budget" as const, label: "예산", icon: Wallet, color: "text-blue-600" },
+    { id: "schedule" as const, label: "일정", icon: Clock, color: "text-green-600" },
+    { id: "income" as const, label: "수입", icon: DollarSign, color: "text-emerald-600" },
+    { id: "realestate" as const, label: "부동산", icon: Building2, color: "text-purple-600" },
+    { id: "notes" as const, label: "메모", icon: StickyNote, color: "text-orange-600" },
+    { id: "settings" as const, label: "설정", icon: Settings, color: "text-gray-600" },
   ]
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Grid Menu Overlay */}
-      {showGridMenu && (
-        <div className="fixed inset-0 z-50 bg-white transition-opacity duration-200">
-          <div className="max-w-lg mx-auto px-5">
-            {/* Header */}
-            <div className="flex items-center justify-between pt-12 mb-8">
-              <h1 className="text-3xl font-light text-gray-900">메뉴</h1>
-              <button
-                onClick={() => setShowGridMenu(false)}
-                className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                aria-label="닫기"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            {/* Grid Menu Items */}
-            <div className="grid grid-cols-2 gap-3 pb-20">
-              {gridMenuItems.map((item) => {
-                const Icon = item.icon
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id)
-                      setShowGridMenu(false)
-                    }}
-                    className="text-left p-5 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors duration-150 h-28 flex flex-col group"
-                  >
-                    <div className="mb-3">
-                      <Icon className={`w-7 h-7 ${item.color}`} />
-                    </div>
-                    <h3 className="text-base font-semibold text-gray-900 mb-0.5 leading-tight">{item.label}</h3>
-                    <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Grid Menu Overlay 제거됨 */}
 
       {activeTab === "dashboard" ? (
         <div className="max-w-lg mx-auto px-5 pb-20">
@@ -348,14 +346,7 @@ export default function EventPlanner() {
               </div>
             )}
             
-            {/* Grid Menu Button */}
-            <button
-              onClick={() => setShowGridMenu(true)}
-              className="absolute top-12 right-0 p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-              aria-label="메뉴"
-            >
-              <Grid3X3 className="w-5 h-5" />
-            </button>
+            {/* 상단 그리드 메뉴 버튼 제거 */}
           </div>
 
         {/* Consolidated Budget Card */}
@@ -384,6 +375,25 @@ export default function EventPlanner() {
             <p className="text-xs text-gray-500 mt-2">
               {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(0) : 0}% 사용
             </p>
+          </div>
+        </div>
+
+        {/* 소형 아이콘 메뉴 (메인 액션 대체) */}
+        <div className="mb-6">
+          <div className="grid grid-cols-4 gap-2">
+            {smallMenuItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className="flex flex-col items-center py-2 rounded-xl transition-colors bg-gray-50 text-gray-700 hover:bg-gray-100"
+                >
+                  <Icon className={`w-5 h-5 ${item.color}`} />
+                  <span className="mt-1 text-[10px] font-medium">{item.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -417,43 +427,13 @@ export default function EventPlanner() {
           </div>
         )}
 
-        {/* Main Actions - Mobile Optimized */}
-        <div className="space-y-3 mb-6">
-          <button
-            className="w-full text-left p-4 bg-gray-50 rounded-2xl active:bg-gray-100 transition-colors"
-            onClick={() => setActiveTab("budget")}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-medium text-gray-900">예산 관리</h3>
-                <p className="text-sm text-gray-500 mt-0.5">{totalCategories}개 카테고리 • {totalBudget.toLocaleString()}원</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </div>
-          </button>
-
-          <button
-            className="w-full text-left p-4 bg-gray-50 rounded-2xl active:bg-gray-100 transition-colors"
-            onClick={() => setActiveTab("schedule")}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-medium text-gray-900">일정 관리</h3>
-                <p className="text-sm text-gray-500 mt-0.5">{completedTasks}/{totalTasks}개 완료</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </div>
-          </button>
-          </div>
+        
         </div>
       ) : (
         renderContent()
       )}
 
-      {/* Mobile Navigation - Hidden when grid menu is open */}
-      {!showGridMenu && (
-        <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
-      )}
+      <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   )
 }
