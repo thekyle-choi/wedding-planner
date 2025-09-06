@@ -4,6 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Upload, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, ArrowLeft, Save, Edit3, MapPin, Star, Loader2, ChevronDown } from "lucide-react"
 
 type DealType = "월세" | "전세" | "매매"
+type ApplyStatus = "예정" | "접수중" | "마감" | "발표대기" | "발표완료"
+
+export type SubscriptionItem = {
+  id: string
+  type: string // 청약 유형 (공공분양, 민간분양, 공공임대 등)
+  name: string // 단지명/청약명
+  location: string // 위치
+  applyDate: string // 접수일
+  applyStatus: ApplyStatus // 접수 상태
+  announceDate?: string // 발표일
+  link?: string // 관련 링크
+  memo?: string // 메모
+  createdAt: number
+  updatedAt: number
+}
 
 export type RealEstateItem = {
   id: string
@@ -32,11 +47,14 @@ export type RealEstateItem = {
 interface RealEstateManagerProps {
   items: RealEstateItem[]
   setItems: (items: RealEstateItem[]) => void
+  subscriptions: SubscriptionItem[]
+  setSubscriptions: (items: SubscriptionItem[]) => void
   onBack?: () => void
 }
 
-export default function RealEstateManager({ items, setItems, onBack }: RealEstateManagerProps) {
+export default function RealEstateManager({ items, setItems, subscriptions, setSubscriptions, onBack }: RealEstateManagerProps) {
   const [mode, setMode] = useState<"list" | "create">("list")
+  const [activeTab, setActiveTab] = useState<"interest" | "subscription">("interest")
   const [keyword, setKeyword] = useState<string>("")
   const [sortBy, setSortBy] = useState<"updated" | "rating" | "priceAsc" | "priceDesc">("updated")
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -60,7 +78,21 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
   const [isEditing, setIsEditing] = useState(false)
   const [preview, setPreview] = useState<{ images: string[]; index: number } | null>(null)
 
+  // 청약 관련 상태
+  const [subscriptionType, setSubscriptionType] = useState<string>("공공분양")
+  const [subscriptionName, setSubscriptionName] = useState<string>("")
+  const [subscriptionLocation, setSubscriptionLocation] = useState<string>("")
+  const [applyDate, setApplyDate] = useState<string>("")
+  const [applyStatus, setApplyStatus] = useState<ApplyStatus>("예정")
+  const [announceDate, setAnnounceDate] = useState<string>("")
+  const [subscriptionLink, setSubscriptionLink] = useState<string>("")
+  const [subscriptionMemo, setSubscriptionMemo] = useState<string>("")
+  const [subscriptionKeyword, setSubscriptionKeyword] = useState<string>("")
+  const [subscriptionSortBy, setSubscriptionSortBy] = useState<"updated" | "applyDate">("updated")
+  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string | null>(null)
+
   const selected = useMemo(() => items.find((i) => i.id === selectedId) || null, [items, selectedId])
+  const selectedSubscription = useMemo(() => subscriptions.find((i) => i.id === selectedSubscriptionId) || null, [subscriptions, selectedSubscriptionId])
 
   // Area conversion handlers
   const handleAreaSqmChange = (value: string) => {
@@ -153,6 +185,25 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
       .sort((a, b) => b.count - a.count)
   }, [filteredSorted])
 
+  // 청약 필터링 및 정렬
+  const filteredSortedSubscriptions = useMemo(() => {
+    const term = subscriptionKeyword.trim()
+    const list = subscriptions.filter((it) => {
+      if (!term) return true
+      const hay = `${it.type} ${it.name} ${it.location} ${it.memo || ""} ${it.applyStatus}`
+      return hay.toLowerCase().includes(term.toLowerCase())
+    })
+
+    const sorted = [...list]
+    sorted.sort((a, b) => {
+      if (subscriptionSortBy === "applyDate") {
+        return new Date(b.applyDate).getTime() - new Date(a.applyDate).getTime()
+      }
+      return (b.updatedAt || 0) - (a.updatedAt || 0)
+    })
+    return sorted
+  }, [subscriptions, subscriptionKeyword, subscriptionSortBy])
+
   const toggleGroupExpanded = (city: string) => {
     const newExpanded = new Set(expandedGroups)
     if (newExpanded.has(city)) {
@@ -233,6 +284,17 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
     setAreaPyeong("")
   }
 
+  const resetSubscriptionForm = () => {
+    setSubscriptionType("공공분양")
+    setSubscriptionName("")
+    setSubscriptionLocation("")
+    setApplyDate("")
+    setApplyStatus("예정")
+    setAnnounceDate("")
+    setSubscriptionLink("")
+    setSubscriptionMemo("")
+  }
+
   const handleCreate = async () => {
     const price =
       dealType === "월세"
@@ -282,6 +344,30 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
     if (!resp.ok) return
     setItems(items.filter((x) => x.id !== id))
     if (selectedId === id) setSelectedId(null)
+  }
+
+  const handleCreateSubscription = async () => {
+    const payload = {
+      type: subscriptionType,
+      name: subscriptionName,
+      location: subscriptionLocation,
+      applyDate,
+      applyStatus,
+      announceDate: announceDate || undefined,
+      link: subscriptionLink || undefined,
+      memo: subscriptionMemo,
+    }
+
+    const resp = await fetch("/api/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    if (!resp.ok) return
+    const json = await resp.json()
+    setSubscriptions([json.item as SubscriptionItem, ...subscriptions])
+    resetSubscriptionForm()
+    setMode("list")
   }
 
   const uploadImages = useCallback(async (item: RealEstateItem, fileList: File[] | FileList | null) => {
@@ -372,6 +458,41 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
     setIsEditing(false)
   }
 
+  const handleSaveSubscriptionDetail = async () => {
+    if (!selectedSubscription) return
+    const resp = await fetch("/api/subscriptions", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: selectedSubscription.id,
+        type: selectedSubscription.type,
+        name: selectedSubscription.name,
+        location: selectedSubscription.location,
+        applyDate: selectedSubscription.applyDate,
+        applyStatus: selectedSubscription.applyStatus,
+        announceDate: selectedSubscription.announceDate,
+        link: selectedSubscription.link,
+        memo: selectedSubscription.memo,
+      }),
+    })
+    if (!resp.ok) return
+    const json = await resp.json()
+    const updated = json.item as SubscriptionItem
+    setSubscriptions(subscriptions.map((x) => (x.id === updated.id ? updated : x)))
+    setIsEditing(false)
+  }
+
+  const handleDeleteSubscription = async (id: string) => {
+    const resp = await fetch("/api/subscriptions", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    })
+    if (!resp.ok) return
+    setSubscriptions(subscriptions.filter((x) => x.id !== id))
+    if (selectedSubscriptionId === id) setSelectedSubscriptionId(null)
+  }
+
   const openPreview = (images: string[], index: number) => setPreview({ images, index })
   const closePreview = () => setPreview(null)
   const showPrev = () => preview && setPreview({ images: preview.images, index: (preview.index - 1 + preview.images.length) % preview.images.length })
@@ -392,6 +513,30 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
             <h1 className="text-3xl font-light text-gray-900">부동산 메모</h1>
           </div>
           <p className="text-sm text-gray-500">부동산 정보 관리</p>
+          
+          {/* 탭 추가 */}
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => setActiveTab("interest")}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === "interest"
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              관심
+            </button>
+            <button
+              onClick={() => setActiveTab("subscription")}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === "subscription"
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              청약
+            </button>
+          </div>
         </div>
       )}
       
@@ -401,9 +546,9 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
             <button onClick={() => setMode("list")} className="p-2 -ml-2">
               <ArrowLeft className="w-5 h-5 text-gray-500" />
             </button>
-            <h1 className="text-3xl font-light text-gray-900">부동산 추가</h1>
+            <h1 className="text-3xl font-light text-gray-900">{activeTab === "interest" ? "부동산 추가" : "청약 추가"}</h1>
           </div>
-          <p className="text-sm text-gray-500">새로운 부동산 정보를 추가하세요</p>
+          <p className="text-sm text-gray-500">{activeTab === "interest" ? "새로운 부동산 정보를 추가하세요" : "새로운 청약 정보를 추가하세요"}</p>
         </div>
       )}
       
@@ -414,12 +559,12 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
             onClick={() => setMode("create")}
             className="flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 active:bg-gray-200"
           >
-            부동산 추가
+            {activeTab === "interest" ? "부동산 추가" : "청약 추가"}
           </button>
         </div>
       )}
 
-      {mode === "create" && (
+      {mode === "create" && activeTab === "interest" && (
         <div className="bg-gray-50 rounded-2xl p-4 mb-6 space-y-3">
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -583,29 +728,129 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
         </div>
       )}
 
+      {mode === "create" && activeTab === "subscription" && (
+        <div className="bg-gray-50 rounded-2xl p-4 mb-6 space-y-3">
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-gray-600">청약 유형</div>
+            <input 
+              value={subscriptionType} 
+              onChange={(e) => setSubscriptionType(e.target.value)} 
+              placeholder="예: 공공분양, 민간분양, 공공임대" 
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
+            />
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-gray-600">단지명/청약명</div>
+            <input 
+              value={subscriptionName} 
+              onChange={(e) => setSubscriptionName(e.target.value)} 
+              placeholder="예: 행복도시 A-1BL" 
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
+            />
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-gray-600">위치</div>
+            <input 
+              value={subscriptionLocation} 
+              onChange={(e) => setSubscriptionLocation(e.target.value)} 
+              placeholder="예: 세종시 행복동" 
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-gray-600">접수일</div>
+              <input 
+                type="date" 
+                value={applyDate} 
+                onChange={(e) => setApplyDate(e.target.value)} 
+                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-gray-600">발표일</div>
+              <input 
+                type="date" 
+                value={announceDate} 
+                onChange={(e) => setAnnounceDate(e.target.value)} 
+                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-gray-600">접수 상태</div>
+            <div className="grid grid-cols-5 gap-2">
+              {(["예정", "접수중", "마감", "발표대기", "발표완료"] as ApplyStatus[]).map((status) => (
+                <button 
+                  key={status}
+                  onClick={() => setApplyStatus(status)} 
+                  className={`py-2 px-3 rounded-lg text-xs ${
+                    applyStatus === status ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-gray-600">관련 링크 (옵션)</div>
+            <input 
+              value={subscriptionLink} 
+              onChange={(e) => setSubscriptionLink(e.target.value)} 
+              placeholder="관련 페이지 URL" 
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
+            />
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-gray-600">메모</div>
+            <textarea 
+              value={subscriptionMemo} 
+              onChange={(e) => setSubscriptionMemo(e.target.value)} 
+              placeholder="특이사항 메모" 
+              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 min-h-[80px]" 
+            />
+          </div>
+
+          <button 
+            onClick={handleCreateSubscription} 
+            className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm font-medium active:bg-gray-800"
+          >
+            청약 추가
+          </button>
+        </div>
+      )}
+
       {mode === "list" && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="검색(위치/메모/가격/면적)"
-              className="flex-1 px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
-            />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
-            >
-              <option value="updated">최신순</option>
-              <option value="rating">등급순</option>
-              <option value="priceAsc">가격낮은순</option>
-              <option value="priceDesc">가격높은순</option>
-            </select>
-          </div>
-          
-          {/* Group View (통합) */}
+          {activeTab === "interest" ? (
             <>
+              <div className="flex items-center gap-2">
+                <input
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="검색(위치/메모/가격/면적)"
+                  className="flex-1 px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                >
+                  <option value="updated">최신순</option>
+                  <option value="rating">등급순</option>
+                  <option value="priceAsc">가격낮은순</option>
+                  <option value="priceDesc">가격높은순</option>
+                </select>
+              </div>
+              
+              {/* Group View (통합) */}
               {groupedData.map(({ city, items, count }) => (
                 <div key={city} className="bg-gray-50 rounded-2xl overflow-hidden">
                   <button
@@ -662,6 +907,67 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
                 </div>
               ))}
             </>
+          ) : (
+            <>
+              {/* 청약 탭 UI */}
+              <div className="flex items-center gap-2">
+                <input
+                  value={subscriptionKeyword}
+                  onChange={(e) => setSubscriptionKeyword(e.target.value)}
+                  placeholder="검색(유형/단지명/위치/메모)"
+                  className="flex-1 px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                />
+                <select
+                  value={subscriptionSortBy}
+                  onChange={(e) => setSubscriptionSortBy(e.target.value as any)}
+                  className="px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                >
+                  <option value="updated">최신순</option>
+                  <option value="applyDate">접수일순</option>
+                </select>
+              </div>
+              
+              {/* 청약 리스트 */}
+              <div className="space-y-2">
+                {filteredSortedSubscriptions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">등록된 청약 정보가 없습니다</p>
+                  </div>
+                ) : (
+                  filteredSortedSubscriptions.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => { setSelectedSubscriptionId(item.id); setIsEditing(false) }}
+                      className="w-full text-left bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                          <div className={`text-xs px-2 py-1 rounded-full ${
+                            item.applyStatus === "접수중" ? "bg-green-100 text-green-700" :
+                            item.applyStatus === "예정" ? "bg-blue-100 text-blue-700" :
+                            item.applyStatus === "마감" ? "bg-gray-100 text-gray-700" :
+                            item.applyStatus === "발표대기" ? "bg-yellow-100 text-yellow-700" :
+                            "bg-red-100 text-red-700"
+                          }`}>
+                            {item.applyStatus}
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          <span className="mr-3">{item.type}</span>
+                          <span className="mr-3">{item.location}</span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          접수일: {item.applyDate || "미정"}
+                          {item.announceDate && ` · 발표일: ${item.announceDate}`}
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
       </div>
@@ -837,6 +1143,138 @@ export default function RealEstateManager({ items, setItems, onBack }: RealEstat
               <button onClick={showNext} className="absolute right-4 p-2 text-white"><ChevronRight className="w-8 h-8" /></button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 청약 상세 */}
+      {selectedSubscription && (
+        <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-center gap-2 p-4 border-b">
+              <button onClick={() => setSelectedSubscriptionId(null)} className="p-2 -ml-2"><ArrowLeft className="w-5 h-5 text-gray-500" /></button>
+              <h3 className="text-base font-semibold">청약 상세</h3>
+              <div className="ml-auto flex items-center gap-2">
+                {!isEditing ? (
+                  <button onClick={() => setIsEditing(true)} className="px-4 py-3 rounded-xl bg-gray-100 text-gray-700 text-sm font-medium active:bg-gray-200 flex items-center gap-1"><Edit3 className="w-4 h-4" />편집</button>
+                ) : (
+                  <button onClick={handleSaveSubscriptionDetail} className="px-4 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium active:bg-gray-800 flex items-center gap-1"><Save className="w-4 h-4" />저장</button>
+                )}
+                <button onClick={() => handleDeleteSubscription(selectedSubscription.id)} className="px-4 py-3 rounded-xl bg-red-50 text-red-600 text-sm font-medium active:bg-red-100 flex items-center gap-1"><Trash2 className="w-4 h-4" />삭제</button>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4 pb-28">
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-600">청약 유형</div>
+                <input 
+                  disabled={!isEditing} 
+                  value={selectedSubscription.type} 
+                  onChange={(e) => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, type: e.target.value } : x))} 
+                  placeholder="청약 유형" 
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-600">단지명/청약명</div>
+                <input 
+                  disabled={!isEditing} 
+                  value={selectedSubscription.name} 
+                  onChange={(e) => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, name: e.target.value } : x))} 
+                  placeholder="단지명" 
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-600">위치</div>
+                <input 
+                  disabled={!isEditing} 
+                  value={selectedSubscription.location} 
+                  onChange={(e) => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, location: e.target.value } : x))} 
+                  placeholder="위치" 
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-gray-600">접수일</div>
+                  <input 
+                    disabled={!isEditing}
+                    type="date" 
+                    value={selectedSubscription.applyDate} 
+                    onChange={(e) => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, applyDate: e.target.value } : x))} 
+                    className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-gray-600">발표일</div>
+                  <input 
+                    disabled={!isEditing}
+                    type="date" 
+                    value={selectedSubscription.announceDate || ""} 
+                    onChange={(e) => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, announceDate: e.target.value || undefined } : x))} 
+                    className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-600">접수 상태</div>
+                <div className="grid grid-cols-5 gap-2">
+                  {(["예정", "접수중", "마감", "발표대기", "발표완료"] as ApplyStatus[]).map((status) => (
+                    <button 
+                      key={status}
+                      disabled={!isEditing}
+                      onClick={() => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, applyStatus: status } : x))} 
+                      className={`py-2 px-3 rounded-lg text-xs ${
+                        selectedSubscription.applyStatus === status ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+                      } disabled:opacity-50`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-600">관련 링크 (옵션)</div>
+                {(!isEditing && selectedSubscription.link && selectedSubscription.link.trim() !== "") ? (
+                  <>
+                    <a
+                      href={normalizeUrl(selectedSubscription.link)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 text-white font-medium active:bg-blue-700"
+                    >
+                      바로가기
+                    </a>
+                    <div className="text-[11px] text-gray-500">{getHostname(selectedSubscription.link)}</div>
+                  </>
+                ) : (
+                  <input 
+                    disabled={!isEditing} 
+                    value={selectedSubscription.link || ""} 
+                    onChange={(e) => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, link: e.target.value || undefined } : x))} 
+                    placeholder="관련 링크 (옵션)" 
+                    className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
+                  />
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-600">메모</div>
+                <textarea 
+                  disabled={!isEditing} 
+                  value={selectedSubscription.memo || ""} 
+                  onChange={(e) => setSubscriptions(subscriptions.map((x) => x.id === selectedSubscription.id ? { ...x, memo: e.target.value || undefined } : x))} 
+                  placeholder="메모" 
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50 min-h-[100px]" 
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

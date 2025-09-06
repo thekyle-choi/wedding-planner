@@ -7,7 +7,7 @@ import ScheduleManager from "./components/schedule-manager"
 import EventSettingsComponent from "./components/event-settings"
 import MobileNav from "./components/mobile-nav"
 import NotesManager from "./components/notes-manager"
-import RealEstateManager, { type RealEstateItem } from "./components/real-estate-manager"
+import RealEstateManager, { type RealEstateItem, type SubscriptionItem } from "./components/real-estate-manager"
 
 interface BudgetGroup {
   id: string
@@ -64,6 +64,7 @@ export default function EventPlanner() {
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
   const [notes, setNotes] = useState<NoteItem[]>([])
   const [realEstateItems, setRealEstateItems] = useState<RealEstateItem[]>([])
+  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
   const [eventSettings, setEventSettings] = useState<EventSettings>({
     eventType: "wedding",
     eventDate: "",
@@ -77,12 +78,13 @@ export default function EventPlanner() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes] = await Promise.all([
+        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes, subscriptionsRes] = await Promise.all([
           fetch("/api/budget"),
           fetch("/api/schedule"),
           fetch("/api/settings"),
           fetch("/api/notes"),
           fetch("/api/realestate"),
+          fetch("/api/subscriptions"),
         ])
 
         if (budgetRes.ok) {
@@ -110,6 +112,11 @@ export default function EventPlanner() {
         if (realEstateRes.ok) {
           const data = await realEstateRes.json()
           setRealEstateItems(Array.isArray(data) ? data : [])
+        }
+
+        if (subscriptionsRes.ok) {
+          const data = await subscriptionsRes.json()
+          setSubscriptions(Array.isArray(data) ? data : [])
         }
       } catch (error) {
         console.error("Failed to load data:", error)
@@ -245,6 +252,8 @@ export default function EventPlanner() {
           <RealEstateManager
             items={realEstateItems}
             setItems={setRealEstateItems}
+            subscriptions={subscriptions}
+            setSubscriptions={setSubscriptions}
           />
         )
       default:
