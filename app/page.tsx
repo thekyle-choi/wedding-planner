@@ -237,8 +237,6 @@ export default function EventPlanner() {
 
   const remainingBudget = totalBudget - totalSpent
 
-  const completedTasks = scheduleItems.filter((item) => item.completed).length
-  const totalTasks = scheduleItems.length
 
   const upcomingTasks = scheduleItems
     .filter((item) => !item.completed && new Date(item.date) >= new Date())
@@ -313,7 +311,6 @@ export default function EventPlanner() {
     }
   }
 
-  const totalCategories = (budgetGroups || []).reduce((sum, group) => sum + (group.categories || []).length, 0)
 
   // 소형 아이콘 메뉴 항목 (대시보드 내 표시용)
   const smallMenuItems = [
@@ -332,21 +329,24 @@ export default function EventPlanner() {
       {activeTab === "dashboard" ? (
         <div className="max-w-lg mx-auto px-5 pb-20">
           {/* Mobile Header */}
-          <div className="relative text-center mb-6 pt-12">
-            <h1 className="text-3xl font-light text-gray-900 mb-1">{eventSettings.eventTitle}</h1>
-            {daysUntilEvent !== null && (
-              <div className="text-center mb-3">
-                <span className={`text-sm font-medium ${
-                  daysUntilEvent > 0 ? "text-gray-900" : 
-                  daysUntilEvent === 0 ? "text-red-600" : "text-gray-500"
+          <div className="relative mb-6 pt-12">
+            <div className="flex items-center justify-between">
+              {/* 왼쪽에 이벤트 타이틀 */}
+              <h1 className="text-2xl font-light text-gray-900">{eventSettings.eventTitle}</h1>
+              
+              {/* 오른쪽에 태그 형태의 D-day */}
+              {daysUntilEvent !== null && (
+                <div className={`px-3 py-1.5 rounded-full ${
+                  daysUntilEvent > 0 ? "bg-gray-100 text-gray-800" : 
+                  daysUntilEvent === 0 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"
                 }`}>
-                  {daysUntilEvent > 0 ? `D-${daysUntilEvent}` : 
-                   daysUntilEvent === 0 ? "오늘!" : `D+${Math.abs(daysUntilEvent)}`}
-                </span>
-              </div>
-            )}
-            
-            {/* 상단 그리드 메뉴 버튼 제거 */}
+                  <span className="text-sm font-medium">
+                    {daysUntilEvent > 0 ? `D-${daysUntilEvent}` : 
+                     daysUntilEvent === 0 ? "오늘!" : `D+${Math.abs(daysUntilEvent)}`}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
         {/* Consolidated Budget Card */}
