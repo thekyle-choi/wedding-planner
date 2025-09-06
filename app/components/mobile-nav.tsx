@@ -11,7 +11,7 @@ export default function MobileNav({ activeTab, setActiveTab }: MobileNavProps) {
   const navItems = [
     { id: "dashboard" as const, label: "홈", icon: Home },
     { id: "budget" as const, label: "예산", icon: Wallet },
-    { id: "income" as const, label: "수입", icon: DollarSign },
+    { id: "schedule" as const, label: "일정", icon: Clock },
     { id: "realestate" as const, label: "부동산", icon: Building2 },
     { id: "notes" as const, label: "메모", icon: StickyNote },
   ]
