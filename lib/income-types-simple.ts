@@ -4,6 +4,7 @@ export interface IncomeItem {
   id: string
   name: string
   type: 'taxable' | 'tax_exempt'
+  unit?: 'yearly' | 'monthly'
   category?: string
   monthlyLimit?: number // 비과세의 경우 월 한도 (예: 식대 20만원)
   description?: string
@@ -82,57 +83,10 @@ export const DEFAULT_INCOME_ITEMS: IncomeItem[] = [
     id: 'base_salary',
     name: '기본급 (연봉)',
     type: 'taxable',
+    unit: 'yearly',
     category: '급여',
     description: '연간 기본급여',
     order: 1,
-    isDefault: true,
-  },
-  {
-    id: 'bonus',
-    name: '상여금',
-    type: 'taxable',
-    category: '급여',
-    description: '연간 상여금',
-    order: 2,
-    isDefault: true,
-  },
-  {
-    id: 'overtime_pay',
-    name: '시간외근무수당',
-    type: 'taxable',
-    category: '수당',
-    description: '연간 초과근무수당',
-    order: 3,
-    isDefault: true,
-  },
-  {
-    id: 'meal_allowance',
-    name: '식대',
-    type: 'tax_exempt',
-    category: '복리후생',
-    monthlyLimit: 200000,
-    description: '월 식대 (최대 20만원)',
-    order: 10,
-    isDefault: true,
-  },
-  {
-    id: 'vehicle_allowance',
-    name: '차량유지비',
-    type: 'tax_exempt',
-    category: '복리후생',
-    monthlyLimit: 200000,
-    description: '월 차량유지비 (최대 20만원)',
-    order: 11,
-    isDefault: true,
-  },
-  {
-    id: 'childcare_allowance',
-    name: '육아수당',
-    type: 'tax_exempt',
-    category: '복리후생',
-    monthlyLimit: 200000,
-    description: '월 육아수당 (최대 20만원)',
-    order: 12,
     isDefault: true,
   },
 ]
@@ -201,7 +155,7 @@ export function createGroupIncomeData(groupName: string): GroupIncomeData {
     template,
     jkData: createPersonData('jk', 'JK'),
     sjData: createPersonData('sj', 'SJ'),
-    isTemplateComplete: false,
+    isTemplateComplete: true,
     lastUpdated: Date.now(),
     createdAt: Date.now(),
   }

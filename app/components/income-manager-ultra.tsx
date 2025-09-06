@@ -30,7 +30,7 @@ interface IncomeManagerUltraProps {
   setIncomeDatabase: (database: IncomeDatabase) => void
 }
 
-type ViewMode = 'empty' | 'group_select' | 'template_setup' | 'summary'
+type ViewMode = 'empty' | 'group_select' | 'summary'
 
 export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }: IncomeManagerUltraProps) {
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(incomeDatabase.currentGroupId)
@@ -66,11 +66,7 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
     if (!incomeDatabase.groups || Object.keys(incomeDatabase.groups).length === 0) {
       setViewMode('empty')
     } else if (currentGroup) {
-      if (!currentGroup.isTemplateComplete) {
-        setViewMode('template_setup')
-      } else {
-        setViewMode('summary')
-      }
+      setViewMode('summary')
     } else {
       setViewMode('group_select')
     }
@@ -101,7 +97,7 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
     
     setIncomeDatabase(updatedDatabase)
     setCurrentGroupId(newGroup.groupId)
-    setViewMode('template_setup')
+    setViewMode('summary')
     setShowCreateGroup(false)
     setNewGroupName('')
     setCreateGroupError('')
@@ -119,7 +115,7 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
     
     setIncomeDatabase(updatedDatabase)
     setCurrentGroupId(groupId)
-    setViewMode(group.isTemplateComplete ? 'summary' : 'template_setup')
+    setViewMode('summary')
   }
 
   // 그룹 삭제
@@ -635,6 +631,7 @@ function PersonInputScreen({
   const [newItem, setNewItem] = useState({ 
     name: '', 
     type: 'taxable' as const, 
+    unit: 'yearly' as const,
     category: '', 
     monthlyLimit: '' 
   })
@@ -661,6 +658,7 @@ function PersonInputScreen({
       id: generateId(),
       name: newItem.name.trim(),
       type: newItem.type,
+      unit: newItem.unit,
       category: newItem.category.trim() || '기타',
       monthlyLimit: newItem.type === 'tax_exempt' && newItem.monthlyLimit 
         ? parseInt(newItem.monthlyLimit) * 10000 // 만원을 실제 금액으로 변환
@@ -677,7 +675,7 @@ function PersonInputScreen({
       updatedAt: Date.now(),
     }
     onUpdate(updatedPerson)
-    setNewItem({ name: '', type: 'taxable', category: '', monthlyLimit: '' })
+    setNewItem({ name: '', type: 'taxable', unit: 'yearly', category: '', monthlyLimit: '' })
     setShowAddItem(false)
   }
 
@@ -693,73 +691,38 @@ function PersonInputScreen({
     onUpdate(updatedPerson)
   }
 
-  // 카테고리별로 소득 항목 그룹화 (템플릿 + 개인 항목)
+  // 단순 리스트로 소득 항목 정렬 (카테고리 구분 없음)
   const personalItems = person.personalItems || []
-  const allItems = [...template.incomeItems, ...personalItems]
-  const groupedIncomeItems = allItems
-    .sort((a, b) => a.order - b.order)
-    .reduce((acc, item) => {
-      const category = item.category || '기타'
-      if (!acc[category]) {
-        acc[category] = []
-      }
-      acc[category].push(item)
-      return acc
-    }, {} as { [category: string]: IncomeItem[] })
+  const allItems = [...template.incomeItems, ...personalItems].sort((a, b) => a.order - b.order)
 
   return (
-    <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="text-center">
-        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <User className="w-8 h-8 text-gray-600" />
-        </div>
-        <h2 className="text-xl font-medium text-gray-900">{person.personName} 소득 입력</h2>
-        <p className="text-sm text-gray-500">금액을 입력하면 자동으로 저장됩니다</p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-gray-900">{person.personName}</h2>
+        <button
+          onClick={() => setShowAddItem(true)}
+          className="text-gray-900 hover:text-gray-700 text-sm font-medium flex items-center gap-1"
+        >
+          <Plus className="w-4 h-4" />
+          항목 추가
+        </button>
       </div>
 
-      {/* 소득 항목 */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900">소득 항목</h3>
-          <button
-            onClick={() => setShowAddItem(true)}
-            className="text-gray-900 hover:text-gray-700 text-sm font-medium flex items-center gap-1"
-          >
-            <Plus className="w-4 h-4" />
-            항목 추가
-          </button>
-        </div>
-        
-        {Object.entries(groupedIncomeItems).map(([category, items]) => (
-          <div key={category} className="space-y-3">
-            <h4 className="text-base font-medium text-gray-900">{category}</h4>
-            {items.map((item) => {
-              const actualValue = incomeValues[item.id] || 0
-              const manwonValue = Math.round(actualValue / 10000) // 실제 금액을 만원으로 변환
-              const isPersonalItem = (person.personalItems || []).some(pi => pi.id === item.id)
-              
-              return (
-                <IncomeInputCard
-                  key={item.id}
-                  item={item}
-                  value={manwonValue}
-                  onChange={(value) => updateIncomeValue(item.id, value)}
-                  onRemove={isPersonalItem ? () => removePersonalItem(item.id) : undefined}
-                />
-              )
-            })}
-          </div>
-        ))}
-      </div>
+      {allItems.map((item) => {
+        const actualValue = incomeValues[item.id] || 0
+        const manwonValue = Math.round(actualValue / 10000)
+        const isPersonalItem = (person.personalItems || []).some(pi => pi.id === item.id)
 
-      {/* 안내 메시지 */}
-      <div className="bg-gray-50 rounded-2xl p-4">
-        <p className="text-sm text-gray-600">
-          💡 <strong>간단한 계산</strong><br />
-          기본공제 150만원이 자동 적용됩니다. 4대보험료와 소득세를 제외한 실수령액을 계산해드려요.
-        </p>
-      </div>
+        return (
+          <IncomeInputCard
+            key={item.id}
+            item={item}
+            value={manwonValue}
+            onChange={(value) => updateIncomeValue(item.id, value)}
+            onRemove={isPersonalItem ? () => removePersonalItem(item.id) : undefined}
+          />
+        )
+      })}
 
       {/* 항목 추가 모달 */}
       {showAddItem && (
@@ -768,7 +731,7 @@ function PersonInputScreen({
           onItemChange={setNewItem}
           onCancel={() => {
             setShowAddItem(false)
-            setNewItem({ name: '', type: 'taxable', category: '', monthlyLimit: '' })
+            setNewItem({ name: '', type: 'taxable', unit: 'yearly', category: '', monthlyLimit: '' })
           }}
           onAdd={addPersonalItem}
         />
@@ -789,7 +752,7 @@ function IncomeInputCard({
   onChange: (value: number) => void
   onRemove?: () => void
 }) {
-  const isMonthly = item.type === 'tax_exempt'
+  const isMonthly = item.unit === 'monthly'
   const displayValue = value === 0 ? '' : value
 
   return (
@@ -1085,6 +1048,15 @@ function AddItemModal({
           >
             <option value="taxable">과세 소득</option>
             <option value="tax_exempt">비과세 소득</option>
+          </select>
+
+          <select
+            value={item.unit}
+            onChange={(e) => onItemChange({...item, unit: e.target.value as 'yearly' | 'monthly'})}
+            className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+          >
+            <option value="yearly">연 기준 입력</option>
+            <option value="monthly">월 기준 입력</option>
           </select>
           
           <input

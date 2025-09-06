@@ -85,8 +85,9 @@ export function calculateTotalTaxableIncome(
   return incomeItems
     .filter(item => item.type === 'taxable')
     .reduce((total, item) => {
-      const value = incomeValues[item.id] || 0
-      return total + value
+      const raw = incomeValues[item.id] || 0
+      const annualValue = (item.unit === 'monthly') ? raw * 12 : raw
+      return total + annualValue
     }, 0)
 }
 
@@ -98,10 +99,10 @@ export function calculateTotalTaxExemptIncome(
   return incomeItems
     .filter(item => item.type === 'tax_exempt')
     .reduce((total, item) => {
-      const monthlyValue = incomeValues[item.id] || 0
-      const annualValue = monthlyValue * 12
+      const raw = incomeValues[item.id] || 0
+      const annualValue = (item.unit === 'monthly') ? raw * 12 : raw
       
-      // 월 한도가 있는 경우 적용
+      // 월 한도가 있는 경우 적용 (한도는 항상 월 기준)
       if (item.monthlyLimit) {
         const maxAnnualValue = item.monthlyLimit * 12
         return total + Math.min(annualValue, maxAnnualValue)
