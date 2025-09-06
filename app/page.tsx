@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Wallet, Clock, StickyNote, Building2, Settings, DollarSign } from "lucide-react"
+import { Wallet, Clock, StickyNote, Building2, Settings, DollarSign, Zap, Armchair } from "lucide-react"
 import BudgetManager from "./components/budget-manager"
 import ScheduleManager from "./components/schedule-manager"
 import EventSettingsComponent from "./components/event-settings"
@@ -9,6 +9,8 @@ import MobileNav from "./components/mobile-nav"
 import NotesManager from "./components/notes-manager"
 import RealEstateManager, { type RealEstateItem, type SubscriptionItem } from "./components/real-estate-manager"
 import IncomeManagerUltra from "./components/income-manager-ultra"
+import ApplianceManager, { type ApplianceCategory, type ApplianceItem } from "./components/appliance-manager"
+import FurnitureManager, { type FurnitureCategory, type FurnitureItem } from "./components/furniture-manager"
 import { type IncomeDatabase, createEmptyIncomeDatabase } from "@/lib/income-types-simple"
 
 interface BudgetGroup {
@@ -62,12 +64,14 @@ interface NoteItem {
 }
 
 export default function EventPlanner() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income">("dashboard")
+  const [activeTab, setActiveTab] = useState<"dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income" | "appliances" | "furniture">("dashboard")
   const [budgetGroups, setBudgetGroups] = useState<BudgetGroup[]>([])
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
   const [notes, setNotes] = useState<NoteItem[]>([])
   const [realEstateItems, setRealEstateItems] = useState<RealEstateItem[]>([])
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
+  const [applianceCategories, setApplianceCategories] = useState<ApplianceCategory[]>([])
+  const [furnitureCategories, setFurnitureCategories] = useState<FurnitureCategory[]>([])
   const [incomeDatabase, setIncomeDatabase] = useState<IncomeDatabase>(createEmptyIncomeDatabase())
   const [eventSettings, setEventSettings] = useState<EventSettings>({
     eventType: "wedding",
@@ -82,7 +86,7 @@ export default function EventPlanner() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes, subscriptionsRes, incomeRes] = await Promise.all([
+        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes, subscriptionsRes, incomeRes, appliancesRes, furnitureRes] = await Promise.all([
           fetch("/api/budget"),
           fetch("/api/schedule"),
           fetch("/api/settings"),
@@ -90,6 +94,8 @@ export default function EventPlanner() {
           fetch("/api/realestate"),
           fetch("/api/subscriptions"),
           fetch("/api/income"),
+          fetch("/api/appliances"),
+          fetch("/api/furniture"),
         ])
 
         if (budgetRes.ok) {
@@ -150,10 +156,22 @@ export default function EventPlanner() {
             setIncomeDatabase(migratedData)
           }
         }
+
+        if (appliancesRes.ok) {
+          const data = await appliancesRes.json()
+          setApplianceCategories(Array.isArray(data) ? data : [])
+        }
+
+        if (furnitureRes.ok) {
+          const data = await furnitureRes.json()
+          setFurnitureCategories(Array.isArray(data) ? data : [])
+        }
       } catch (error) {
         console.error("Failed to load data:", error)
         setBudgetGroups([])
         setScheduleItems([])
+        setApplianceCategories([])
+        setFurnitureCategories([])
       } finally {
         setLoading(false)
       }
@@ -212,6 +230,32 @@ export default function EventPlanner() {
       setIncomeDatabase(database)
     } catch (error) {
       console.error("Failed to save income database:", error)
+    }
+  }
+
+  const saveApplianceCategories = async (categories: ApplianceCategory[]) => {
+    try {
+      await fetch("/api/appliances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(categories),
+      })
+      setApplianceCategories(categories)
+    } catch (error) {
+      console.error("Failed to save appliance categories:", error)
+    }
+  }
+
+  const saveFurnitureCategories = async (categories: FurnitureCategory[]) => {
+    try {
+      await fetch("/api/furniture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(categories),
+      })
+      setFurnitureCategories(categories)
+    } catch (error) {
+      console.error("Failed to save furniture categories:", error)
     }
   }
 
@@ -306,6 +350,20 @@ export default function EventPlanner() {
             setIncomeDatabase={saveIncomeDatabase}
           />
         )
+      case "appliances":
+        return (
+          <ApplianceManager
+            categories={applianceCategories}
+            setCategories={saveApplianceCategories}
+          />
+        )
+      case "furniture":
+        return (
+          <FurnitureManager
+            categories={furnitureCategories}
+            setCategories={saveFurnitureCategories}
+          />
+        )
       default:
         return null
     }
@@ -318,6 +376,8 @@ export default function EventPlanner() {
     { id: "schedule" as const, label: "일정", icon: Clock, color: "text-green-600" },
     { id: "income" as const, label: "수입", icon: DollarSign, color: "text-emerald-600" },
     { id: "realestate" as const, label: "부동산", icon: Building2, color: "text-purple-600" },
+    { id: "appliances" as const, label: "가전", icon: Zap, color: "text-yellow-600" },
+    { id: "furniture" as const, label: "가구", icon: Armchair, color: "text-amber-600" },
     { id: "notes" as const, label: "메모", icon: StickyNote, color: "text-orange-600" },
     { id: "settings" as const, label: "설정", icon: Settings, color: "text-gray-600" },
   ]

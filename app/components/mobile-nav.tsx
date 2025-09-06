@@ -1,10 +1,10 @@
 "use client"
 
-import { Home, Wallet, Clock, Settings, StickyNote, Building2, DollarSign } from "lucide-react"
+import { Home, Wallet, Clock, Settings, StickyNote, Building2, DollarSign, Zap } from "lucide-react"
 
 interface MobileNavProps {
-  activeTab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income"
-  setActiveTab: (tab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income") => void
+  activeTab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income" | "appliances" | "furniture"
+  setActiveTab: (tab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income" | "appliances" | "furniture") => void
 }
 
 export default function MobileNav({ activeTab, setActiveTab }: MobileNavProps) {
