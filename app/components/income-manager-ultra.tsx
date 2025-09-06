@@ -20,6 +20,7 @@ import {
 } from "@/lib/income-types-simple"
 import { 
   calculateGroupIncome, 
+  calculatePersonIncome,
   formatCurrency, 
   formatPercentage,
   createEmptyCalculation 
@@ -408,18 +409,30 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
                   {hasJKInput && hasSJInput && (
                     <div className="bg-gray-50 rounded-2xl p-5">
                       <h2 className="text-base font-medium text-gray-900 mb-4">부부 합산 소득</h2>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-2xl font-light text-gray-900">
-                            {formatCurrency(calculatedIncome.combined.totalNetIncome)}
-                          </p>
-                          <p className="text-sm text-gray-600">연간 실수령액</p>
+                      
+                      {/* 주요 금액 - 연간 기준으로 통일 */}
+                      <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm text-gray-500">연간 세전 소득</span>
+                          <div className="text-right">
+                            <span className="text-2xl font-light text-gray-900">
+                              {formatCurrency(calculatedIncome.combined.totalGrossIncome)}
+                            </span>
+                            <p className="text-sm text-gray-500">
+                              ({formatCurrency(Math.round(calculatedIncome.combined.totalGrossIncome / 12))}/월)
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-2xl font-light text-gray-900">
-                            {formatCurrency(calculatedIncome.combined.monthlyTotalNetIncome)}
-                          </p>
-                          <p className="text-sm text-gray-600">월 실수령액</p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-500">연간 실수령액</span>
+                          <div className="text-right">
+                            <span className="text-2xl font-semibold text-gray-900">
+                              {formatCurrency(calculatedIncome.combined.totalNetIncome)}
+                            </span>
+                            <p className="text-sm text-gray-500">
+                              ({formatCurrency(calculatedIncome.combined.monthlyTotalNetIncome)}/월)
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -434,7 +447,7 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
                     {/* JK 소득 카드 - 입력이 있을 때만 */}
                     {hasJKInput && (
                       <div className="bg-gray-50 rounded-2xl p-4">
-                        <div className="flex justify-between items-start mb-3">
+                        <div className="flex justify-between items-start mb-4">
                           <h4 className="text-base font-medium text-gray-900">JK</h4>
                           <button
                             onClick={() => setActiveTab('jk')}
@@ -443,18 +456,30 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
                             <Edit3 className="w-4 h-4" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-lg font-light text-gray-900">
-                              {formatCurrency(calculatedIncome.jk.calculations.netIncome)}
-                            </p>
-                            <p className="text-xs text-gray-500">연간 실수령액</p>
+                        
+                        {/* 주요 금액 - 연간 기준으로 통일 */}
+                        <div className="mb-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-gray-500">연간 세전 소득</span>
+                            <div className="text-right">
+                              <span className="text-lg font-light text-gray-900">
+                                {formatCurrency(calculatedIncome.jk.calculations.grossIncome)}
+                              </span>
+                              <p className="text-xs text-gray-500">
+                                ({formatCurrency(Math.round(calculatedIncome.jk.calculations.grossIncome / 12))}/월)
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-lg font-light text-gray-900">
-                              {formatCurrency(calculatedIncome.jk.calculations.monthlyNetIncome)}
-                            </p>
-                            <p className="text-xs text-gray-500">월 실수령액</p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-500">연간 실수령액</span>
+                            <div className="text-right">
+                              <span className="text-lg font-semibold text-gray-900">
+                                {formatCurrency(calculatedIncome.jk.calculations.netIncome)}
+                              </span>
+                              <p className="text-xs text-gray-500">
+                                ({formatCurrency(calculatedIncome.jk.calculations.monthlyNetIncome)}/월)
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -463,7 +488,7 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
                     {/* SJ 소득 카드 - 입력이 있을 때만 */}
                     {hasSJInput && (
                       <div className="bg-gray-50 rounded-2xl p-4">
-                        <div className="flex justify-between items-start mb-3">
+                        <div className="flex justify-between items-start mb-4">
                           <h4 className="text-base font-medium text-gray-900">SJ</h4>
                           <button
                             onClick={() => setActiveTab('sj')}
@@ -472,18 +497,30 @@ export default function IncomeManagerUltra({ incomeDatabase, setIncomeDatabase }
                             <Edit3 className="w-4 h-4" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-lg font-light text-gray-900">
-                              {formatCurrency(calculatedIncome.sj.calculations.netIncome)}
-                            </p>
-                            <p className="text-xs text-gray-500">연간 실수령액</p>
+                        
+                        {/* 주요 금액 - 연간 기준으로 통일 */}
+                        <div className="mb-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-gray-500">연간 세전 소득</span>
+                            <div className="text-right">
+                              <span className="text-lg font-light text-gray-900">
+                                {formatCurrency(calculatedIncome.sj.calculations.grossIncome)}
+                              </span>
+                              <p className="text-xs text-gray-500">
+                                ({formatCurrency(Math.round(calculatedIncome.sj.calculations.grossIncome / 12))}/월)
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-lg font-light text-gray-900">
-                              {formatCurrency(calculatedIncome.sj.calculations.monthlyNetIncome)}
-                            </p>
-                            <p className="text-xs text-gray-500">월 실수령액</p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-500">연간 실수령액</span>
+                            <div className="text-right">
+                              <span className="text-lg font-semibold text-gray-900">
+                                {formatCurrency(calculatedIncome.sj.calculations.netIncome)}
+                              </span>
+                              <p className="text-xs text-gray-500">
+                                ({formatCurrency(calculatedIncome.sj.calculations.monthlyNetIncome)}/월)
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -695,6 +732,9 @@ function PersonInputScreen({
   const personalItems = person.personalItems || []
   const allItems = [...template.incomeItems, ...personalItems].sort((a, b) => a.order - b.order)
 
+  // 개인 소득 계산
+  const personalCalculation = calculatePersonIncome(person, template.incomeItems)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -706,6 +746,24 @@ function PersonInputScreen({
           <Plus className="w-4 h-4" />
           항목 추가
         </button>
+      </div>
+
+      {/* 세전/세후 총계 */}
+      <div className="bg-gray-50 rounded-xl p-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-gray-500 mb-1">세전 소득</p>
+            <p className="text-lg font-medium text-gray-900">
+              {formatCurrency(personalCalculation.calculations.grossIncome)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">세후 소득</p>
+            <p className="text-lg font-medium text-gray-900">
+              {formatCurrency(personalCalculation.calculations.netIncome)}
+            </p>
+          </div>
+        </div>
       </div>
 
       {allItems.map((item) => {
