@@ -20,7 +20,6 @@ export type FurnitureItem = {
   specs?: string
   price: number
   url?: string
-  priority: number
   notes?: string
   images: string[]
   createdAt: number
@@ -36,7 +35,7 @@ interface FurnitureManagerProps {
 export default function FurnitureManager({ categories, setCategories, onBack }: FurnitureManagerProps) {
   const [mode, setMode] = useState<"list" | "create-category" | "create-item">("list")
   const [keyword, setKeyword] = useState<string>("")
-  const [sortBy, setSortBy] = useState<"updated" | "price" | "priority">("updated")
+  const [sortBy, setSortBy] = useState<"updated" | "price">("updated")
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -57,7 +56,6 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
   const [itemSpecs, setItemSpecs] = useState<string>("")
   const [itemPrice, setItemPrice] = useState<string>("")
   const [itemUrl, setItemUrl] = useState<string>("")
-  const [itemPriority, setItemPriority] = useState<number>(1)
   const [itemNotes, setItemNotes] = useState<string>("")
   const [createImages, setCreateImages] = useState<string[]>([])
 
@@ -95,8 +93,6 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
         switch (sortBy) {
           case "price":
             return a.price - b.price
-          case "priority":
-            return a.priority - b.priority
           case "updated":
           default:
             return (b.updatedAt || 0) - (a.updatedAt || 0)
@@ -105,11 +101,12 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
     })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   }, [filteredCategories, sortBy])
 
-  // Calculate total price based on priority 1 items
+  // Calculate total price based on average price per category
   const totalPrice = useMemo(() => {
     return categories.reduce((sum, category) => {
-      const priority1Item = category.items.find(item => item.priority === 1)
-      return sum + (priority1Item?.price || 0)
+      if (category.items.length === 0) return sum
+      const avgPrice = category.items.reduce((itemSum, item) => itemSum + item.price, 0) / category.items.length
+      return sum + avgPrice
     }, 0)
   }, [categories])
 
@@ -142,7 +139,6 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
     setItemSpecs("")
     setItemPrice("")
     setItemUrl("")
-    setItemPriority(1)
     setItemNotes("")
     setCreateImages([])
   }
@@ -176,7 +172,6 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
       specs: itemSpecs.trim() || undefined,
       price: parseFloat(itemPrice.replace(/[^\d.]/g, "")) || 0,
       url: itemUrl.trim() || undefined,
-      priority: itemPriority,
       notes: itemNotes.trim() || undefined,
       images: createImages,
       createdAt: Date.now(),
@@ -376,14 +371,6 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
     return price.toLocaleString() + "원"
   }
 
-  const getPriorityColor = (priority: number): string => {
-    switch (priority) {
-      case 1: return "text-red-600 bg-red-50"
-      case 2: return "text-orange-600 bg-orange-50"
-      case 3: return "text-yellow-600 bg-yellow-50"
-      default: return "text-gray-600 bg-gray-50"
-    }
-  }
 
   return (
     <div className="min-h-screen bg-white pb-20">
@@ -405,7 +392,7 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
             <div className="mt-4 p-4 bg-yellow-50 rounded-2xl">
               <div className="text-center">
                 <p className="text-2xl font-light text-gray-900">{formatPrice(totalPrice)}</p>
-                <p className="text-sm text-gray-600">1순위 기준 총 가격</p>
+                <p className="text-sm text-gray-600">평균 기준 총 가격</p>
               </div>
             </div>
           </div>
@@ -514,31 +501,15 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <div className="text-xs font-medium text-gray-600">가격 *</div>
-                <input 
-                  value={itemPrice}
-                  onChange={(e) => setItemPrice(e.target.value)}
-                  inputMode="numeric"
-                  placeholder="0" 
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="text-xs font-medium text-gray-600">우선순위</div>
-                <select
-                  value={itemPriority}
-                  onChange={(e) => setItemPriority(parseInt(e.target.value))}
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
-                >
-                  <option value={1}>1순위</option>
-                  <option value={2}>2순위</option>
-                  <option value={3}>3순위</option>
-                  <option value={4}>4순위</option>
-                  <option value={5}>5순위</option>
-                </select>
-              </div>
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-gray-600">가격 *</div>
+              <input 
+                value={itemPrice}
+                onChange={(e) => setItemPrice(e.target.value)}
+                inputMode="numeric"
+                placeholder="0" 
+                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400" 
+              />
             </div>
 
             <div className="space-y-1">
@@ -608,7 +579,6 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
               >
                 <option value="updated">최신순</option>
                 <option value="price">가격순</option>
-                <option value="priority">우선순위</option>
               </select>
             </div>
 
@@ -669,9 +639,6 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
                               <div className="flex-1 space-y-1">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-gray-900 text-sm">{item.name}</span>
-                                  <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(item.priority)}`}>
-                                    {item.priority}순위
-                                  </span>
                                 </div>
                                 {(item.brand || item.model) && (
                                   <div className="text-xs text-gray-600">
@@ -788,42 +755,20 @@ export default function FurnitureManager({ categories, setCategories, onBack }: 
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <div className="text-xs font-medium text-gray-600">가격</div>
-                  <input 
-                    disabled={!isEditing}
-                    value={selectedItem.price} 
-                    onChange={(e) => setCategories(categories.map(cat => ({
-                      ...cat,
-                      items: cat.items.map(item => 
-                        item.id === selectedItem.id ? { ...item, price: parseFloat(e.target.value.replace(/[^\d.]/g, "")) || 0 } : item
-                      )
-                    })))}
-                    inputMode="numeric"
-                    className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs font-medium text-gray-600">우선순위</div>
-                  <select
-                    disabled={!isEditing}
-                    value={selectedItem.priority}
-                    onChange={(e) => setCategories(categories.map(cat => ({
-                      ...cat,
-                      items: cat.items.map(item => 
-                        item.id === selectedItem.id ? { ...item, priority: parseInt(e.target.value) } : item
-                      )
-                    })))}
-                    className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50"
-                  >
-                    <option value={1}>1순위</option>
-                    <option value={2}>2순위</option>
-                    <option value={3}>3순위</option>
-                    <option value={4}>4순위</option>
-                    <option value={5}>5순위</option>
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-gray-600">가격</div>
+                <input 
+                  disabled={!isEditing}
+                  value={selectedItem.price} 
+                  onChange={(e) => setCategories(categories.map(cat => ({
+                    ...cat,
+                    items: cat.items.map(item => 
+                      item.id === selectedItem.id ? { ...item, price: parseFloat(e.target.value.replace(/[^\d.]/g, "")) || 0 } : item
+                    )
+                  })))}
+                  inputMode="numeric"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400 disabled:bg-gray-50" 
+                />
               </div>
 
               <div className="space-y-1">

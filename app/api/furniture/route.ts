@@ -21,7 +21,6 @@ type FurnitureItem = {
   specs?: string
   price: number
   url?: string
-  priority: number
   notes?: string
   images: string[]
   createdAt: number
@@ -45,7 +44,6 @@ export async function GET() {
               specs: typeof item?.specs === "string" ? item.specs : undefined,
               price: typeof item?.price === "number" ? item.price : 0,
               url: typeof item?.url === "string" ? item.url : undefined,
-              priority: typeof item?.priority === "number" ? item.priority : 1,
               notes: typeof item?.notes === "string" ? item.notes : undefined,
               images: Array.isArray(item?.images)
                 ? item.images.filter((x: unknown) => typeof x === "string")
@@ -93,7 +91,6 @@ export async function POST(request: NextRequest) {
             specs: typeof item?.specs === "string" ? item.specs : undefined,
             price: typeof item?.price === "number" ? item.price : 0,
             url: typeof item?.url === "string" ? item.url : undefined,
-            priority: typeof item?.priority === "number" && item.priority >= 1 && item.priority <= 5 ? item.priority : 1,
             notes: typeof item?.notes === "string" ? item.notes : undefined,
             images: Array.isArray(item?.images) 
               ? item.images.filter((x: unknown) => typeof x === "string")
