@@ -1,7 +1,19 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Plus, Upload, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, ArrowLeft, Save, Edit3, Tag, Search } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Plus, Upload, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, ArrowLeft, Save, Edit3, Tag, Search, MessageCircle, Send, Loader2 } from "lucide-react"
+
+type TargetType = "realestate" | "subscription" | "notes"
+
+export type CommentItem = {
+  id: string
+  targetId: string
+  targetType: TargetType
+  content: string
+  author: "SJ" | "JK"
+  createdAt: number
+  updatedAt: number
+}
 
 type NoteItem = {
   id: string
@@ -46,8 +58,91 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
   const touchEndX = useRef<number | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  
+  // 댓글 관련 상태
+  const [comments, setComments] = useState<CommentItem[]>([])
+  const [allComments, setAllComments] = useState<CommentItem[]>([]) // 모든 댓글 (리스트 표시용)
+  const [commentInput, setCommentInput] = useState<string>("")
+  const [commentLoading, setCommentLoading] = useState<boolean>(false)
+  const [selectedAuthor, setSelectedAuthor] = useState<"SJ" | "JK">("SJ")
 
   const selectedNote = useMemo(() => notes.find((n) => n.id === selectedId) || null, [notes, selectedId])
+
+  // 댓글 관련 함수들
+  const loadComments = useCallback(async (targetId: string, targetType: TargetType) => {
+    try {
+      setCommentLoading(true)
+      const resp = await fetch(`/api/comments?targetId=${targetId}&targetType=${targetType}`)
+      if (resp.ok) {
+        const data = await resp.json()
+        setComments(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Failed to load comments:", error)
+      setComments([])
+    } finally {
+      setCommentLoading(false)
+    }
+  }, [])
+
+  // 모든 댓글 로드 (리스트 표시용)
+  const loadAllComments = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/comments?targetType=notes")
+      const notesComments = resp.ok ? await resp.json() : []
+      setAllComments(Array.isArray(notesComments) ? notesComments : [])
+    } catch (error) {
+      console.error("Failed to load all comments:", error)
+      setAllComments([])
+    }
+  }, [])
+
+  const addComment = useCallback(async (targetId: string, targetType: TargetType, content: string, author: "SJ" | "JK") => {
+    if (!content.trim()) return
+    try {
+      const resp = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetId,
+          targetType,
+          content: content.trim(),
+          author,
+        }),
+      })
+      if (resp.ok) {
+        const json = await resp.json()
+        setComments(prev => [...prev, json.comment])
+        setAllComments(prev => [...prev, json.comment])
+        setCommentInput("")
+      }
+    } catch (error) {
+      console.error("Failed to add comment:", error)
+    }
+  }, [])
+
+  const deleteComment = useCallback(async (commentId: string) => {
+    try {
+      const resp = await fetch("/api/comments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: commentId }),
+      })
+      if (resp.ok) {
+        setComments(prev => prev.filter(c => c.id !== commentId))
+        setAllComments(prev => prev.filter(c => c.id !== commentId))
+      }
+    } catch (error) {
+      console.error("Failed to delete comment:", error)
+    }
+  }, [])
+
+  // 댓글 수 계산 함수
+  const getCommentCount = useCallback((targetId: string, targetType: TargetType) => {
+    return allComments.filter(comment => 
+      comment.targetId === targetId && comment.targetType === targetType
+    ).length
+  }, [allComments])
 
   // 실제로 사용중인 카테고리들만 추출
   const usedCategories = useMemo(() => {
@@ -90,6 +185,20 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
   useEffect(() => {
     // nothing
   }, [])
+
+  // 컴포넌트 마운트 시 모든 댓글 로드
+  useEffect(() => {
+    loadAllComments()
+  }, [loadAllComments])
+
+  // 선택된 메모 항목의 댓글 불러오기
+  useEffect(() => {
+    if (selectedNote) {
+      loadComments(selectedNote.id, "notes")
+    } else {
+      setComments([])
+    }
+  }, [selectedNote, loadComments])
 
 
   const handleAddNote = async () => {
@@ -425,12 +534,22 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
                   <p className="text-xs text-gray-500 truncate mb-2">{note.content}</p>
                   
                   <div className="flex items-center justify-between">
-                    {note.images.length > 0 && (
-                      <div className="flex items-center text-gray-400">
-                        <ImageIcon className="w-3 h-3 mr-1" />
-                        <span className="text-[10px]">{note.images.length}개 이미지</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {note.images.length > 0 && (
+                        <div className="flex items-center text-gray-400">
+                          <ImageIcon className="w-3 h-3 mr-1" />
+                          <span className="text-[10px]">{note.images.length}개 이미지</span>
+                        </div>
+                      )}
+                      {getCommentCount(note.id, "notes") > 0 && (
+                        <div className="flex items-center gap-1">
+                          <MessageCircle className="w-3 h-3 text-blue-500" />
+                          <span className="text-[10px] text-blue-500 font-medium">
+                            {getCommentCount(note.id, "notes")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <div className="text-[10px] text-gray-400 ml-auto">
                       {new Date(note.updatedAt).toLocaleDateString("ko-KR")}
                     </div>
@@ -492,7 +611,106 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
+              {/* 댓글 섹션 */}
+              <div className="space-y-3 mt-4">
+                <div className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                  <MessageCircle className="w-4 h-4 text-gray-500" /> 
+                  댓글 ({comments.length})
+                </div>
+                
+                {/* 댓글 입력 */}
+                <div className="space-y-2">
+                  {/* 작성자 선택 */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSelectedAuthor("SJ")}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedAuthor === "SJ" 
+                          ? "bg-gray-900 text-white" 
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      SJ
+                    </button>
+                    <button
+                      onClick={() => setSelectedAuthor("JK")}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedAuthor === "JK" 
+                          ? "bg-gray-900 text-white" 
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      JK
+                    </button>
+                  </div>
+                  
+                  {/* 댓글 입력창 */}
+                  <div className="flex gap-2">
+                    <input
+                      value={commentInput}
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      placeholder="댓글을 입력하세요..."
+                      className="flex-1 px-3 py-2 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey && commentInput.trim()) {
+                          e.preventDefault()
+                          addComment(selectedNote.id, "notes", commentInput, selectedAuthor)
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => addComment(selectedNote.id, "notes", commentInput, selectedAuthor)}
+                      disabled={!commentInput.trim()}
+                      className="px-3 py-2 rounded-xl bg-gray-900 text-white text-sm font-medium active:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 댓글 리스트 */}
+                {commentLoading ? (
+                  <div className="flex items-center justify-center py-4 text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> 댓글 로딩 중...
+                  </div>
+                ) : comments.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                comment.author === "SJ" 
+                                  ? "bg-blue-100 text-blue-700" 
+                                  : "bg-green-100 text-green-700"
+                              }`}>
+                                {comment.author}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(comment.createdAt).toLocaleString("ko-KR")}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-900">{comment.content}</div>
+                          </div>
+                          <button
+                            onClick={() => deleteComment(comment.id)}
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500 text-sm">
+                    아직 댓글이 없습니다
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between mt-4">
                 <div className="text-[10px] text-gray-400">{new Date(selectedNote.updatedAt).toLocaleString("ko-KR")}</div>
                 <div className="flex items-center gap-2">
                   <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleUploadImages(selectedNote, e.target.files)} />

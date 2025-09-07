@@ -5,9 +5,10 @@ import { Home, Wallet, Clock, Settings, StickyNote, Building2, DollarSign, Zap }
 interface MobileNavProps {
   activeTab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income" | "appliances" | "furniture"
   setActiveTab: (tab: "dashboard" | "budget" | "schedule" | "notes" | "realestate" | "settings" | "income" | "appliances" | "furniture") => void
+  onHomeClick?: () => void
 }
 
-export default function MobileNav({ activeTab, setActiveTab }: MobileNavProps) {
+export default function MobileNav({ activeTab, setActiveTab, onHomeClick }: MobileNavProps) {
   const navItems = [
     { id: "dashboard" as const, label: "홈", icon: Home },
     { id: "budget" as const, label: "예산", icon: Wallet },
@@ -27,7 +28,12 @@ export default function MobileNav({ activeTab, setActiveTab }: MobileNavProps) {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  if (item.id === "dashboard" && onHomeClick) {
+                    onHomeClick()
+                  }
+                  setActiveTab(item.id)
+                }}
                 className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all duration-200 min-w-[72px] ${
                   isActive 
                     ? "text-gray-900" 

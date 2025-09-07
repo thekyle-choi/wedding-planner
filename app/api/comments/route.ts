@@ -4,7 +4,7 @@ import { type NextRequest, NextResponse } from "next/server"
 const redis = Redis.fromEnv()
 const COMMENTS_KEY = "wedding:comments"
 
-type TargetType = "realestate" | "subscription"
+type TargetType = "realestate" | "subscription" | "notes"
 
 type CommentItem = {
   id: string
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const targetId = searchParams.get("targetId")
     const targetType = searchParams.get("targetType")
 
-    if (!targetType || !["realestate", "subscription"].includes(targetType)) {
+    if (!targetType || !["realestate", "subscription", "notes"].includes(targetType)) {
       return NextResponse.json({ error: "invalid_params" }, { status: 400 })
     }
 
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "invalid_params" }, { status: 400 })
     }
 
-    if (!["realestate", "subscription"].includes(targetType)) {
+    if (!["realestate", "subscription", "notes"].includes(targetType)) {
       return NextResponse.json({ error: "invalid_target_type" }, { status: 400 })
     }
 

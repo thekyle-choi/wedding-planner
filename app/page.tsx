@@ -81,103 +81,114 @@ export default function EventPlanner() {
     theme: "classic",
   })
   const [loading, setLoading] = useState(true)
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false)
 
   // Load data from Redis
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes, subscriptionsRes, incomeRes, appliancesRes, furnitureRes] = await Promise.all([
-          fetch("/api/budget"),
-          fetch("/api/schedule"),
-          fetch("/api/settings"),
-          fetch("/api/notes"),
-          fetch("/api/realestate"),
-          fetch("/api/subscriptions"),
-          fetch("/api/income"),
-          fetch("/api/appliances"),
-          fetch("/api/furniture"),
-        ])
+  const loadData = async (isBackgroundRefresh = false) => {
+    try {
+      if (isBackgroundRefresh) {
+        setBackgroundRefreshing(true)
+      }
 
-        if (budgetRes.ok) {
-          const budgetData = await budgetRes.json()
-          setBudgetGroups(Array.isArray(budgetData) ? budgetData : [])
+      const [budgetRes, scheduleRes, settingsRes, notesRes, realEstateRes, subscriptionsRes, incomeRes, appliancesRes, furnitureRes] = await Promise.all([
+        fetch("/api/budget"),
+        fetch("/api/schedule"),
+        fetch("/api/settings"),
+        fetch("/api/notes"),
+        fetch("/api/realestate"),
+        fetch("/api/subscriptions"),
+        fetch("/api/income"),
+        fetch("/api/appliances"),
+        fetch("/api/furniture"),
+      ])
+
+      if (budgetRes.ok) {
+        const budgetData = await budgetRes.json()
+        setBudgetGroups(Array.isArray(budgetData) ? budgetData : [])
+      }
+
+      if (scheduleRes.ok) {
+        const scheduleData = await scheduleRes.json()
+        setScheduleItems(Array.isArray(scheduleData) ? scheduleData : [])
+      }
+
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json()
+        if (settingsData) {
+          setEventSettings(settingsData)
         }
+      }
 
-        if (scheduleRes.ok) {
-          const scheduleData = await scheduleRes.json()
-          setScheduleItems(Array.isArray(scheduleData) ? scheduleData : [])
-        }
+      if (notesRes.ok) {
+        const notesData = await notesRes.json()
+        setNotes(Array.isArray(notesData) ? notesData : [])
+      }
 
-        if (settingsRes.ok) {
-          const settingsData = await settingsRes.json()
-          if (settingsData) {
-            setEventSettings(settingsData)
-          }
-        }
+      if (realEstateRes.ok) {
+        const data = await realEstateRes.json()
+        setRealEstateItems(Array.isArray(data) ? data : [])
+      }
 
-        if (notesRes.ok) {
-          const notesData = await notesRes.json()
-          setNotes(Array.isArray(notesData) ? notesData : [])
-        }
+      if (subscriptionsRes.ok) {
+        const data = await subscriptionsRes.json()
+        setSubscriptions(Array.isArray(data) ? data : [])
+      }
 
-        if (realEstateRes.ok) {
-          const data = await realEstateRes.json()
-          setRealEstateItems(Array.isArray(data) ? data : [])
-        }
-
-        if (subscriptionsRes.ok) {
-          const data = await subscriptionsRes.json()
-          setSubscriptions(Array.isArray(data) ? data : [])
-        }
-
-        if (incomeRes.ok) {
-          const data = await incomeRes.json()
-          if (data) {
-            // 기존 데이터에 personalItems가 없는 경우 빈 배열로 초기화
-            const migratedData = {
-              ...data,
-              groups: Object.fromEntries(
-                Object.entries(data.groups || {}).map(([groupId, group]: [string, any]) => [
-                  groupId,
-                  {
-                    ...group,
-                    jkData: {
-                      ...group.jkData,
-                      personalItems: group.jkData?.personalItems || []
-                    },
-                    sjData: {
-                      ...group.sjData,
-                      personalItems: group.sjData?.personalItems || []
-                    }
+      if (incomeRes.ok) {
+        const data = await incomeRes.json()
+        if (data) {
+          // 기존 데이터에 personalItems가 없는 경우 빈 배열로 초기화
+          const migratedData = {
+            ...data,
+            groups: Object.fromEntries(
+              Object.entries(data.groups || {}).map(([groupId, group]: [string, any]) => [
+                groupId,
+                {
+                  ...group,
+                  jkData: {
+                    ...group.jkData,
+                    personalItems: group.jkData?.personalItems || []
+                  },
+                  sjData: {
+                    ...group.sjData,
+                    personalItems: group.sjData?.personalItems || []
                   }
-                ])
-              )
-            }
-            setIncomeDatabase(migratedData)
+                }
+              ])
+            )
           }
+          setIncomeDatabase(migratedData)
         }
+      }
 
-        if (appliancesRes.ok) {
-          const data = await appliancesRes.json()
-          setApplianceCategories(Array.isArray(data) ? data : [])
-        }
+      if (appliancesRes.ok) {
+        const data = await appliancesRes.json()
+        setApplianceCategories(Array.isArray(data) ? data : [])
+      }
 
-        if (furnitureRes.ok) {
-          const data = await furnitureRes.json()
-          setFurnitureCategories(Array.isArray(data) ? data : [])
-        }
-      } catch (error) {
-        console.error("Failed to load data:", error)
+      if (furnitureRes.ok) {
+        const data = await furnitureRes.json()
+        setFurnitureCategories(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Failed to load data:", error)
+      if (!isBackgroundRefresh) {
         setBudgetGroups([])
         setScheduleItems([])
         setApplianceCategories([])
         setFurnitureCategories([])
-      } finally {
+      }
+    } finally {
+      if (isBackgroundRefresh) {
+        setBackgroundRefreshing(false)
+      } else {
         setLoading(false)
       }
     }
+  }
 
-    loadData()
+  useEffect(() => {
+    loadData(false)
   }, [])
 
   // Save functions
@@ -388,6 +399,15 @@ export default function EventPlanner() {
 
       {activeTab === "dashboard" ? (
         <div className="max-w-lg mx-auto px-5 pb-20">
+          {/* Background refresh indicator */}
+          {backgroundRefreshing && (
+            <div className="fixed top-0 left-0 right-0 z-50">
+              <div className="h-1 bg-gray-100">
+                <div className="h-full w-full bg-blue-500 animate-pulse"></div>
+              </div>
+            </div>
+          )}
+          
           {/* Mobile Header */}
           <div className="relative mb-6 pt-12">
             <div className="flex items-center justify-between">
@@ -493,7 +513,16 @@ export default function EventPlanner() {
         renderContent()
       )}
 
-      <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <MobileNav 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab}
+        onHomeClick={() => {
+          // 현재 대시보드가 아닌 탭에서 홈으로 이동할 때만 백그라운드 새로고침 실행
+          if (activeTab !== "dashboard") {
+            loadData(true)
+          }
+        }}
+      />
     </div>
   )
 }
