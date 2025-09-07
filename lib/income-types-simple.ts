@@ -26,6 +26,7 @@ export interface PersonIncomeData {
   groupId: string
   incomeValues: { [itemId: string]: number } // 항목별 금액
   personalItems?: IncomeItem[] // 개인별 추가 항목 (선택적 필드)
+  templateOverrides?: { [itemId: string]: IncomeItem } // 기본 템플릿 항목의 개인별 오버라이드
   updatedAt: number
 }
 
@@ -146,6 +147,7 @@ export function createGroupIncomeData(groupName: string): GroupIncomeData {
     groupId,
     incomeValues: {},
     personalItems: [],
+    templateOverrides: {},
     updatedAt: Date.now(),
   })
 

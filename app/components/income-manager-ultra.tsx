@@ -728,9 +728,48 @@ function PersonInputScreen({
     onUpdate(updatedPerson)
   }
 
+  // 항목 업데이트 (기본 항목 + 개인 항목)
+  const updateItem = (updatedItem: IncomeItem) => {
+    const isPersonalItem = (person.personalItems || []).some(pi => pi.id === updatedItem.id)
+    
+    if (isPersonalItem) {
+      // 개인 항목 업데이트
+      const currentPersonalItems = person.personalItems || []
+      const updatedPersonalItems = currentPersonalItems.map(item =>
+        item.id === updatedItem.id ? updatedItem : item
+      )
+      const updatedPerson: PersonIncomeData = {
+        ...person,
+        personalItems: updatedPersonalItems,
+        updatedAt: Date.now(),
+      }
+      onUpdate(updatedPerson)
+    } else {
+      // 기본 항목 업데이트 - person의 personalTemplateOverrides에 저장
+      const currentOverrides = person.templateOverrides || {}
+      const updatedOverrides = {
+        ...currentOverrides,
+        [updatedItem.id]: updatedItem
+      }
+      const updatedPerson: PersonIncomeData = {
+        ...person,
+        templateOverrides: updatedOverrides,
+        updatedAt: Date.now(),
+      }
+      onUpdate(updatedPerson)
+    }
+  }
+
   // 단순 리스트로 소득 항목 정렬 (카테고리 구분 없음)
   const personalItems = person.personalItems || []
-  const allItems = [...template.incomeItems, ...personalItems].sort((a, b) => a.order - b.order)
+  const templateOverrides = person.templateOverrides || {}
+  
+  // 기본 템플릿 항목에 오버라이드 적용
+  const effectiveTemplateItems = template.incomeItems.map(item => 
+    templateOverrides[item.id] || item
+  )
+  
+  const allItems = [...effectiveTemplateItems, ...personalItems].sort((a, b) => a.order - b.order)
 
   // 개인 소득 계산
   const personalCalculation = calculatePersonIncome(person, template.incomeItems)
@@ -778,6 +817,7 @@ function PersonInputScreen({
             value={manwonValue}
             onChange={(value) => updateIncomeValue(item.id, value)}
             onRemove={isPersonalItem ? () => removePersonalItem(item.id) : undefined}
+            onUpdate={updateItem}
           />
         )
       })}
@@ -803,15 +843,104 @@ function IncomeInputCard({
   item,
   value,
   onChange,
-  onRemove
+  onRemove,
+  onUpdate
 }: {
   item: IncomeItem
   value: number
   onChange: (value: number) => void
   onRemove?: () => void
+  onUpdate?: (updatedItem: IncomeItem) => void
 }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedItem, setEditedItem] = useState(item)
+  
   const isMonthly = item.unit === 'monthly'
   const displayValue = value === 0 ? '' : value
+
+  const handleSave = () => {
+    if (onUpdate) {
+      onUpdate(editedItem)
+    }
+    setIsEditing(false)
+  }
+
+  const handleCancel = () => {
+    setEditedItem(item)
+    setIsEditing(false)
+  }
+
+  if (isEditing) {
+    return (
+      <div className="bg-gray-50 rounded-xl p-4">
+        <h5 className="font-medium text-gray-900 mb-3">항목 수정</h5>
+        
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={editedItem.name}
+            onChange={(e) => setEditedItem({...editedItem, name: e.target.value})}
+            placeholder="항목명"
+            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+          />
+          
+          <select
+            value={editedItem.type}
+            onChange={(e) => setEditedItem({...editedItem, type: e.target.value as 'taxable' | 'tax_exempt'})}
+            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+          >
+            <option value="taxable">과세 소득</option>
+            <option value="tax_exempt">비과세 소득</option>
+          </select>
+
+          <select
+            value={editedItem.unit}
+            onChange={(e) => setEditedItem({...editedItem, unit: e.target.value as 'yearly' | 'monthly'})}
+            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+          >
+            <option value="yearly">연 기준 입력</option>
+            <option value="monthly">월 기준 입력</option>
+          </select>
+          
+          <input
+            type="text"
+            value={editedItem.category || ''}
+            onChange={(e) => setEditedItem({...editedItem, category: e.target.value})}
+            placeholder="카테고리"
+            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+          />
+          
+          {editedItem.type === 'tax_exempt' && (
+            <input
+              type="number"
+              value={editedItem.monthlyLimit ? Math.round(editedItem.monthlyLimit / 10000) : ''}
+              onChange={(e) => setEditedItem({
+                ...editedItem, 
+                monthlyLimit: e.target.value ? parseInt(e.target.value) * 10000 : undefined
+              })}
+              placeholder="월 한도액 (만원)"
+              className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-gray-400"
+            />
+          )}
+        </div>
+
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={handleSave}
+            className="flex-1 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium active:bg-gray-800"
+          >
+            저장
+          </button>
+          <button
+            onClick={handleCancel}
+            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg text-sm font-medium active:bg-gray-300"
+          >
+            취소
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-gray-50 rounded-xl p-4">
@@ -826,14 +955,26 @@ function IncomeInputCard({
             {item.type === 'taxable' ? '과세' : '비과세'}
           </span>
         </div>
-        {onRemove && (
+        <div className="flex items-center gap-1">
           <button
-            onClick={onRemove}
-            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+            onClick={() => setIsEditing(true)}
+            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <Edit3 className="w-4 h-4" />
           </button>
-        )}
+          {onRemove && (
+            <button
+              onClick={() => {
+                if (confirm(`"${item.name}" 항목을 삭제하시겠습니까?`)) {
+                  onRemove()
+                }
+              }}
+              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {item.description && (

@@ -137,8 +137,13 @@ export function calculatePersonIncome(
   personData: PersonIncomeData,
   incomeItems: IncomeItem[]
 ): CalculatedPersonIncome {
+  // 템플릿 항목에 오버라이드 적용
+  const effectiveTemplateItems = incomeItems.map(item => 
+    (personData.templateOverrides && personData.templateOverrides[item.id]) || item
+  )
+  
   // 템플릿 항목 + 개인 항목 합치기 (personalItems가 없을 경우 빈 배열로 처리)
-  const allItems = [...incomeItems, ...(personData.personalItems || [])]
+  const allItems = [...effectiveTemplateItems, ...(personData.personalItems || [])]
   
   // 총 과세소득 계산
   const totalTaxableIncome = calculateTotalTaxableIncome(allItems, personData.incomeValues)
@@ -248,6 +253,7 @@ export function createEmptyCalculation(personId: 'jk' | 'sj', groupId: string): 
     groupId,
     incomeValues: {},
     personalItems: [],
+    templateOverrides: {},
     updatedAt: Date.now(),
   }
 

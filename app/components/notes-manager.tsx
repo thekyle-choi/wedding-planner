@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Plus, Upload, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, ArrowLeft, Save, Edit3, Grid, List, Tag } from "lucide-react"
+import { Plus, Upload, Trash2, Image as ImageIcon, X, ChevronLeft, ChevronRight, ArrowLeft, Save, Edit3, Tag, Search } from "lucide-react"
 
 type NoteItem = {
   id: string
@@ -34,10 +34,14 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
   const [content, setContent] = useState("")
   const [category, setCategory] = useState("")
   const [mode, setMode] = useState<"list" | "create">("list")
-  const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const createFileInputRef = useRef<HTMLInputElement | null>(null)
   const [preview, setPreview] = useState<{ images: string[]; index: number } | null>(null)
+  const [tempImages, setTempImages] = useState<string[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const touchStartX = useRef<number | null>(null)
   const touchEndX = useRef<number | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -45,15 +49,37 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
 
   const selectedNote = useMemo(() => notes.find((n) => n.id === selectedId) || null, [notes, selectedId])
 
-  const groupedNotes = useMemo(() => {
-    const groups: Record<string, NoteItem[]> = {}
+  // 실제로 사용중인 카테고리들만 추출
+  const usedCategories = useMemo(() => {
+    const categories = new Set<string>()
     notes.forEach(note => {
-      const category = note.category || "uncategorized"
-      if (!groups[category]) groups[category] = []
-      groups[category].push(note)
+      if (note.category) categories.add(note.category)
     })
-    return groups
+    return Array.from(categories).map(cat => {
+      const categoryInfo = categoryOptions.find(opt => opt.value === cat)
+      return categoryInfo || { value: cat, label: cat, color: "bg-gray-100 text-gray-800" }
+    })
   }, [notes])
+
+  const filteredNotes = useMemo(() => {
+    let filtered = [...notes]
+    
+    // 검색어 필터링
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(note => 
+        note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        note.content.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+    
+    // 카테고리 필터링
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter(note => note.category === selectedCategory)
+    }
+    
+    // 최신순 정렬
+    return filtered.sort((a, b) => b.updatedAt - a.updatedAt)
+  }, [notes, searchTerm, selectedCategory])
 
   const getCategoryInfo = (categoryValue: string) => {
     if (!categoryValue) return { value: "uncategorized", label: "미분류", color: "bg-gray-100 text-gray-500" }
@@ -67,19 +93,41 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
 
 
   const handleAddNote = async () => {
-    const payload = { title, content, category, images: [] as string[] }
-    const resp = await fetch("/api/notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-    if (!resp.ok) return
-    const data = await resp.json()
-    setNotes([data.item, ...notes])
-    setTitle("")
-    setContent("")
-    setCategory("")
-    setMode("list")
+    setUploading(true)
+    try {
+      // 이미지 업로드
+      const imageUrls: string[] = []
+      for (const file of selectedFiles) {
+        const fd = new FormData()
+        fd.append("file", file)
+        const uploadResp = await fetch("/api/upload", { method: "POST", body: fd })
+        if (uploadResp.ok) {
+          const json = await uploadResp.json()
+          if (json.url) imageUrls.push(json.url)
+        }
+      }
+
+      // 메모 생성
+      const payload = { title, content, category, images: imageUrls }
+      const resp = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!resp.ok) return
+      const data = await resp.json()
+      setNotes([data.item, ...notes])
+      
+      // 초기화
+      setTitle("")
+      setContent("")
+      setCategory("")
+      setTempImages([])
+      setSelectedFiles([])
+      setMode("list")
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -117,6 +165,30 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
     }
+  }
+
+  const handleCreateFileSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    
+    const newFiles = Array.from(files)
+    const newTempImages: string[] = []
+    
+    newFiles.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setTempImages(prev => [...prev, e.target!.result as string])
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+    
+    setSelectedFiles(prev => [...prev, ...newFiles])
+  }
+
+  const removeCreateImage = (index: number) => {
+    setTempImages(prev => prev.filter((_, i) => i !== index))
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSaveDetail = async () => {
@@ -174,7 +246,7 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
           </div>
         ) : mode === "create" ? (
           <div className="flex items-center gap-2">
-            <button className="p-2 -ml-2 rounded-xl hover:bg-gray-100" onClick={() => setMode("list")} aria-label="뒤로">
+            <button className="p-2 -ml-2 rounded-xl hover:bg-gray-100" onClick={() => { setMode("list"); setTempImages([]); setSelectedFiles([]) }} aria-label="뒤로">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h1 className="text-3xl font-light text-gray-900 mb-1">새 메모 작성</h1>
@@ -186,34 +258,52 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
             </div>
             <p className="text-sm text-gray-500 mb-6">간단한 메모와 사진을 보관하세요</p>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2 mb-6">
+            {/* Action Button */}
+            <div className="mb-4">
               <button
                 onClick={() => setMode("create")}
-                className="flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 active:bg-gray-200"
+                className="w-full py-3 px-4 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 active:bg-gray-200"
               >
                 메모 추가
               </button>
-              <div className="flex items-center gap-0">
-                <div className="flex rounded-lg bg-gray-100 p-1">
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
-                      viewMode === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
-                      viewMode === "grid" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
-                    }`}
-                  >
-                    <Grid className="w-4 h-4" />
-                  </button>
-                </div>
+            </div>
+
+            {/* Search and Filter */}
+            <div className="space-y-3 mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-gray-400 transition"
+                  placeholder="메모 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
+              
+              {usedCategories.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedCategory("all")}
+                    className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
+                      selectedCategory === "all" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    전체
+                  </button>
+                  {usedCategories.map(cat => (
+                    <button
+                      key={cat.value}
+                      onClick={() => setSelectedCategory(cat.value)}
+                      className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
+                        selectedCategory === cat.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -240,134 +330,124 @@ export default function NotesManager({ notes, setNotes }: NotesManagerProps) {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             />
+            
+            {/* 이미지 업로드 영역 */}
+            <div className="space-y-2">
+              <input 
+                ref={createFileInputRef} 
+                type="file" 
+                accept="image/*" 
+                multiple 
+                className="hidden" 
+                onChange={(e) => handleCreateFileSelect(e.target.files)} 
+              />
+              <button
+                type="button"
+                className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 text-sm font-medium hover:border-gray-400 active:bg-gray-50"
+                onClick={() => createFileInputRef.current?.click()}
+              >
+                <Upload className="inline-block w-4 h-4 mr-2" />
+                사진 추가
+              </button>
+              
+              {/* 미리보기 */}
+              {tempImages.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {tempImages.map((img, idx) => (
+                    <div key={idx} className="relative group">
+                      <img 
+                        src={img} 
+                        alt={`preview ${idx}`} 
+                        className="w-full h-24 object-cover rounded-lg border border-gray-200" 
+                      />
+                      <button
+                        type="button"
+                        className="absolute top-1 right-1 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center"
+                        onClick={() => removeCreateImage(idx)}
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
             <button
               className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm font-medium active:bg-gray-800 disabled:opacity-50"
               onClick={handleAddNote}
-              disabled={!content.trim() && !title.trim()}
+              disabled={!content.trim() && !title.trim() && uploading}
             >
-              메모 저장
+              {uploading ? "저장 중..." : "메모 저장"}
             </button>
           </div>
         )}
 
         {mode === "list" && !selectedNote ? (
-          <div className="space-y-6">
-            {Object.entries(groupedNotes).map(([categoryValue, categoryNotes]) => {
-              const categoryInfo = getCategoryInfo(categoryValue)
-              return (
-                <div key={categoryValue}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${categoryInfo.color}`}>
-                      <Tag className="w-3 h-3 inline mr-1" />
-                      {categoryInfo.label}
-                    </span>
-                    <span className="text-xs text-gray-400">({categoryNotes.length}개)</span>
+          <div className="space-y-2">
+            {filteredNotes.map((note) => (
+              <button
+                key={note.id}
+                className="w-full text-left border border-gray-100 rounded-xl p-4 active:bg-gray-50"
+                onClick={() => setSelectedId(note.id)}
+              >
+                <div className="flex flex-col">
+                  <div className="flex items-start gap-2 mb-1">
+                    {note.category && (
+                      <span className={`px-2 py-0.5 text-[10px] rounded-full shrink-0 ${getCategoryInfo(note.category).color}`}>
+                        {getCategoryInfo(note.category).label}
+                      </span>
+                    )}
+                    <p className="text-sm font-medium text-gray-900 truncate flex-1">
+                      {note.title || "제목 없음"}
+                    </p>
                   </div>
                   
-                  {viewMode === "grid" ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {categoryNotes.map((note) => (
-                        <button
-                          key={note.id}
-                          className="text-left border border-gray-100 rounded-xl p-3 active:bg-gray-50 h-32 flex flex-col"
-                          onClick={() => setSelectedId(note.id)}
-                        >
-                          <p className="text-sm font-medium text-gray-900 truncate mb-1">
-                            {note.title || "제목 없음"}
-                          </p>
-                          
-                          {note.images.length > 0 && (
-                            <div className="flex gap-1 mb-2 overflow-hidden">
-                              {note.images.slice(0, 4).map((image, idx) => (
-                                <div key={idx} className="w-6 h-6 rounded bg-gray-100 overflow-hidden shrink-0">
-                                  <img 
-                                    src={image} 
-                                    alt="" 
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              ))}
-                              {note.images.length > 4 && (
-                                <div className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center shrink-0">
-                                  <span className="text-[8px] text-gray-600">+{note.images.length - 4}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          <p className="text-xs text-gray-500 flex-1 line-clamp-2 leading-relaxed mb-2">
-                            {note.content}
-                          </p>
-                          
-                          <div className="flex items-center justify-between">
-                            {note.images.length > 0 && (
-                              <div className="flex items-center text-gray-400">
-                                <ImageIcon className="w-3 h-3 mr-1" />
-                                <span className="text-[10px]">{note.images.length}</span>
-                              </div>
-                            )}
-                            <div className="text-[10px] text-gray-400 ml-auto">
-                              {new Date(note.updatedAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                ) : (
-                  <div className="space-y-2">
-                    {categoryNotes.map((note) => (
-                      <button
-                        key={note.id}
-                        className="w-full text-left border border-gray-100 rounded-xl p-4 active:bg-gray-50"
-                        onClick={() => setSelectedId(note.id)}
-                      >
-                        <div className="flex flex-col">
-                          <p className="text-sm font-medium text-gray-900 truncate mb-1">
-                            {note.title || "제목 없음"}
-                          </p>
-                          
-                          {note.images.length > 0 && (
-                            <div className="flex gap-1 mb-2 overflow-hidden">
-                              {note.images.slice(0, 6).map((image, idx) => (
-                                <div key={idx} className="w-6 h-6 rounded bg-gray-100 overflow-hidden shrink-0">
-                                  <img 
-                                    src={image} 
-                                    alt="" 
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              ))}
-                              {note.images.length > 6 && (
-                                <div className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center shrink-0">
-                                  <span className="text-[8px] text-gray-600">+{note.images.length - 6}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          <p className="text-xs text-gray-500 truncate mb-2">{note.content}</p>
-                          
-                          <div className="flex items-center justify-between">
-                            {note.images.length > 0 && (
-                              <div className="flex items-center text-gray-400">
-                                <ImageIcon className="w-3 h-3 mr-1" />
-                                <span className="text-[10px]">{note.images.length}개 이미지</span>
-                              </div>
-                            )}
-                            <div className="text-[10px] text-gray-400 ml-auto">
-                              {new Date(note.updatedAt).toLocaleDateString("ko-KR")}
-                            </div>
-                          </div>
+                  {note.images.length > 0 && (
+                    <div className="flex gap-1 mb-2 overflow-hidden">
+                      {note.images.slice(0, 6).map((image, idx) => (
+                        <div key={idx} className="w-6 h-6 rounded bg-gray-100 overflow-hidden shrink-0">
+                          <img 
+                            src={image} 
+                            alt="" 
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                      </button>
-                    ))}
+                      ))}
+                      {note.images.length > 6 && (
+                        <div className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center shrink-0">
+                          <span className="text-[8px] text-gray-600">+{note.images.length - 6}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <p className="text-xs text-gray-500 truncate mb-2">{note.content}</p>
+                  
+                  <div className="flex items-center justify-between">
+                    {note.images.length > 0 && (
+                      <div className="flex items-center text-gray-400">
+                        <ImageIcon className="w-3 h-3 mr-1" />
+                        <span className="text-[10px]">{note.images.length}개 이미지</span>
+                      </div>
+                    )}
+                    <div className="text-[10px] text-gray-400 ml-auto">
+                      {new Date(note.updatedAt).toLocaleDateString("ko-KR")}
+                    </div>
                   </div>
-                )}
-              </div>
-            )
-          })}
+                </div>
+              </button>
+            ))}
           
-          {notes.length === 0 && (
+          {filteredNotes.length === 0 && searchTerm && (
+            <div className="text-center py-12">
+              <Search className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 mb-2">검색 결과가 없습니다</p>
+              <p className="text-sm text-gray-400">다른 검색어를 시도해보세요</p>
+            </div>
+          )}
+          
+          {notes.length === 0 && !searchTerm && (
             <div className="text-center py-12">
               <Tag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 mb-2">메모를 추가해보세요</p>
