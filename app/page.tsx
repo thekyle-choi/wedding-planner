@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Wallet, Clock, StickyNote, Building2, Settings, DollarSign, Zap, Armchair } from "lucide-react"
+import { Wallet, Clock, StickyNote, Building2, Settings, DollarSign, Zap, Armchair, Lock } from "lucide-react"
 import BudgetManager from "./components/budget-manager"
 import ScheduleManager from "./components/schedule-manager"
 import EventSettingsComponent from "./components/event-settings"
@@ -82,6 +82,9 @@ export default function EventPlanner() {
   })
   const [loading, setLoading] = useState(true)
   const [backgroundRefreshing, setBackgroundRefreshing] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [password, setPassword] = useState("")
+  const [passwordError, setPasswordError] = useState(false)
 
   // Load data from Redis
   const loadData = async (isBackgroundRefresh = false) => {
@@ -188,8 +191,29 @@ export default function EventPlanner() {
   }
 
   useEffect(() => {
-    loadData(false)
+    // 로컬 스토리지에서 인증 상태 확인
+    const authStatus = localStorage.getItem("wedding_planner_auth")
+    if (authStatus === "authenticated") {
+      setIsAuthenticated(true)
+      loadData(false)
+    } else {
+      setLoading(false)
+    }
   }, [])
+
+  // 비밀번호 검증 함수
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (password === "0325") {
+      setIsAuthenticated(true)
+      setPasswordError(false)
+      localStorage.setItem("wedding_planner_auth", "authenticated")
+      loadData(false)
+    } else {
+      setPasswordError(true)
+      setPassword("")
+    }
+  }
 
   // Save functions
   const saveBudgetData = async (groups: BudgetGroup[]) => {
@@ -302,12 +326,60 @@ export default function EventPlanner() {
     ? Math.ceil((new Date(eventSettings.eventDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null
 
+  // 로딩 화면
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-8 h-8 border-4 border-gray-900 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 비밀번호 입력 화면
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-5">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+              <Lock className="w-8 h-8 text-gray-600" />
+            </div>
+            <h1 className="text-2xl font-light text-gray-900 mb-2">비밀번호를 입력하세요</h1>
+            <p className="text-sm text-gray-500">웨딩 플래너에 접속하려면 비밀번호가 필요합니다</p>
+          </div>
+          
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호"
+                className={`w-full px-4 py-3 bg-gray-50 rounded-xl text-center text-lg tracking-widest focus:outline-none focus:ring-2 transition-all ${
+                  passwordError 
+                    ? "border-2 border-red-500 focus:ring-red-200" 
+                    : "border-2 border-transparent focus:ring-gray-300"
+                }`}
+                autoFocus
+                maxLength={4}
+                inputMode="numeric"
+              />
+              {passwordError && (
+                <p className="mt-2 text-sm text-red-500 text-center">비밀번호가 올바르지 않습니다</p>
+              )}
+            </div>
+            
+            <button
+              type="submit"
+              disabled={!password}
+              className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              확인
+            </button>
+          </form>
         </div>
       </div>
     )

@@ -533,6 +533,24 @@ export default function RealEstateManager({ items, setItems, subscriptions, setS
     }
   }, [items])
 
+  // 이미지 삭제 함수 추가
+  const deleteImage = useCallback(async (item: RealEstateItem, imageIndex: number) => {
+    try {
+      const newImages = item.images.filter((_, idx) => idx !== imageIndex)
+      const put = await fetch("/api/realestate", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, images: newImages }),
+      })
+      if (!put.ok) return
+      const updatedResp = await put.json()
+      const updatedItem = updatedResp.item as RealEstateItem
+      setItems(items.map((x) => (x.id === item.id ? updatedItem : x)))
+    } catch (error) {
+      console.error("Failed to delete image:", error)
+    }
+  }, [items])
+
   // create-mode images
   const [createImages, setCreateImages] = useState<string[]>([])
   const uploadCreateImages = useCallback(async (fileList: File[] | FileList | null) => {
@@ -839,8 +857,14 @@ export default function RealEstateManager({ items, setItems, subscriptions, setS
               {createImages.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {createImages.map((url, idx) => (
-                    <div key={idx} className="relative">
+                    <div key={idx} className="relative group">
                       <img src={url} alt="img" className="w-full h-24 object-cover rounded-lg" />
+                      <button
+                        onClick={() => setCreateImages(createImages.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1259,9 +1283,19 @@ export default function RealEstateManager({ items, setItems, subscriptions, setS
               {selected.images.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2">
                   {selected.images.map((url, idx) => (
-                    <button key={idx} onClick={() => openPreview(selected.images, idx)} className="relative">
-                      <img src={url} alt="img" className="w-full h-24 object-cover rounded-lg" />
-                    </button>
+                    <div key={idx} className="relative group">
+                      <button onClick={() => openPreview(selected.images, idx)} className="w-full">
+                        <img src={url} alt="img" className="w-full h-24 object-cover rounded-lg" />
+                      </button>
+                      {isEditing && (
+                        <button
+                          onClick={() => deleteImage(selected, idx)}
+                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : (
